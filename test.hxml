@@ -1,0 +1,6 @@
+--class-path src
+--class-path test
+--library uuid
+--main Test
+--js bin/main.js
+

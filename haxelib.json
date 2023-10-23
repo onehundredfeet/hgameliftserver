@@ -1,0 +1,15 @@
+{
+    "name": "hgameliftserver",
+    "url" : "https://github.com/onehundredfeet/hgameliftserver",
+    "license": "MIT",
+    "tags": [ "aws", "gamelift" ],
+    "description": "Lightweight port of the C# AWS GameLift Server SDK to Haxe",
+    "version": "0.1.0",
+    "classPath": "src/",
+    "releasenote": "Initial release",
+    "contributors": ["onehundredfeet" ],
+    "dependencies": {
+        "uuid": ""
+      }
+  }
+  
