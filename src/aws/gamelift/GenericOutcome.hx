@@ -6,7 +6,7 @@ class GenericOutcome {
 	public final error:GameLiftError;
 	public final success:Bool;
 
-	function new(  error : GameLiftError = null) {
+	public function new(  error : GameLiftError = null) {
 		this.success = error == null;
         this.error = error;
 	}

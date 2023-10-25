@@ -1,6 +1,9 @@
 --class-path src
 --class-path test
 --library uuid
+--library seedyrng
+--library hxWebSockets
+--library haxe-concurrent
 --main Test
 --js bin/main.js
 

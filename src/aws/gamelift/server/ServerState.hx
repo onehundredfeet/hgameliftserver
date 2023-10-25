@@ -1,17 +1,19 @@
 package aws.gamelift.server;
+import seedyrng.*;
+import aws.gamelift.server.model.*;
 
-interface IWebSocketMessageHandler {
+import aws.gamelift.TimeSpan;
+import aws.gamelift.IGameLiftWebSocket;
+import aws.gamelift.ILog;
+import aws.gamelift.Util;
+import aws.gamelift.IWebSocketMessageHandler;
+import aws.gamelift.GameLiftError;
 
-} 
-
-interface IGameLiftWebSocket {
-
-}
 
 class ServerState implements IWebSocketMessageHandler
     {
         // When within 15 minutes of expiration we retrieve new instance role credentials
-        public static final  InstanceRoleCredentialTtlMin : TimeSpan = TimeSpan.FromMinutes(15);
+        public static final  InstanceRoleCredentialTtlMin : TimeSpan = TimeSpan.fromMinutes(15);
 
         private static final EnvironmentVariableWebsocketUrl = "GAMELIFT_SDK_WEBSOCKET_URL";
         private static final EnvironmentVariableProcessId = "GAMELIFT_SDK_PROCESS_ID";
@@ -27,29 +29,29 @@ class ServerState implements IWebSocketMessageHandler
 
         private static final Epoch : Date = new Date(1970, 1, 1, 0, 0, 0);
 
-        private static readonly Random Random = new Random();
+        private static final random = new Random(new Xorshift64Plus());
 
         private final  gameLiftWebSocket : IGameLiftWebSocket;
         private final  webSocketRequestHandler : GameLiftWebSocketRequestHandler;
 
-        // Map of RoleArn -> Credentials for that role
-        private instanceRoleResultCache = new Map<String, GetFleetRoleCredentialsResult>();
+        // Map of roleArn -> Credentials for that role
+        private var instanceRoleResultCache = new Map<String, GetFleetRoleCredentialsResult>();
 
-        private  processParameters : ProcessParameters;
-        @:volatile private processReady : Bool; 
+        private var processParameters : ProcessParameters;
+        @:volatile private var processIsReady : Bool; 
         private var gameSessionId : String;
-        private Date terminationTime = Date.MinValue; // init to 1/1/0001 12:00:00 AM
+        private var terminationTime : Date;// = Date.MinValue; // init to 1/1/0001 12:00:00 AM
         private var fleetId : String;
         private var hostId : String;
         private var processId : String;
         // Assume we're on managed EC2, if GetFleetRoleCredentials fails we know to set this to false
-        private bool onManagedEc2 = true;
+        private var onManagedEc2 = true;
 
         public static var instance(default,null) = new ServerState();
 
-//        public static ILog Log { get; } = LogManager.GetLogger(typeof(ServerState));
+        public static final  Log : ILog = LogManager.GetLogger(Type.typeof(ServerState));
 
-        public function new(IGameLiftWebSocket webSocket = null, GameLiftWebSocketRequestHandler requestHandler = null)
+        public function new( webSocket : IGameLiftWebSocket = null,  requestHandler : GameLiftWebSocketRequestHandler= null)
         {
             gameLiftWebSocket = webSocket != null ? webSocket : new GameLiftWebSocket(this);
             webSocketRequestHandler = requestHandler != null ? requestHandler : new GameLiftWebSocketRequestHandler(gameLiftWebSocket);
@@ -58,22 +60,22 @@ class ServerState implements IWebSocketMessageHandler
 
         public function processReady( procParameters : ProcessParameters) : GenericOutcome
         {
-            processReady = true;
+            processIsReady = true;
             processParameters = procParameters;
 
-            GenericOutcome result = gameLiftWebSocket.SendMessage(new ActivateServerProcessRequest(
+            var result = gameLiftWebSocket.sendMessage(new ActivateServerProcessRequest(
                 GameLiftServerAPI.GetSdkVersion().Result, SdkLanguage, processParameters.Port, processParameters.LogParameters.LogPaths));
 
-            Task.Run(() => StartHealthCheck());
+            Task.run(() -> StartHealthCheck());
 
             return result;
         }
 
         public function ProcessEnding() : GenericOutcome
         {
-            processReady = false;
+            processIsReady = false;
 
-            GenericOutcome result = gameLiftWebSocket.SendMessage(
+            var result = gameLiftWebSocket.sendMessage(
                 new TerminateServerProcessRequest());
 
             return result;
@@ -81,22 +83,22 @@ class ServerState implements IWebSocketMessageHandler
 
         public function  ActivateGameSession() : GenericOutcome
         {
-            if (String.IsNullOrEmpty(gameSessionId))
+            if (isNullOrEmpty(gameSessionId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
             }
 
-            return gameLiftWebSocket.SendMessage(new ActivateGameSessionRequest(gameSessionId));
+            return gameLiftWebSocket.sendMessage(new ActivateGameSessionRequest(gameSessionId));
         }
 
         public function  GetGameSessionId() : AwsStringOutcome
         {
-            if (String.IsNullOrEmpty(gameSessionId))
+            if (isNullOrEmpty(gameSessionId))
             {
                 return new AwsStringOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
             }
 
-            return new AwsStringOutcome(gameSessionId);
+            return new AwsStringOutcome(null, gameSessionId);
         }
 
         public function  GetTerminationTime() : AwsDateTimeOutcome
@@ -106,40 +108,40 @@ class ServerState implements IWebSocketMessageHandler
                 return new AwsDateTimeOutcome(new GameLiftError(GameLiftErrorType.TERMINATION_TIME_NOT_SET));
             }
 
-            return new AwsDateTimeOutcome(terminationTime);
+            return new AwsDateTimeOutcome(null, terminationTime);
         }
 
-        public function  UpdatePlayerSessionCreationPolicy(PlayerSessionCreationPolicy playerSessionPolicy) : GenericOutcome
+        public function  UpdatePlayerSessionCreationPolicy( playerSessionPolicy : PlayerSessionCreationPolicy) : GenericOutcome
         {
-            if (string.IsNullOrEmpty(gameSessionId))
+            if (isNullOrEmpty(gameSessionId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
             }
 
-            return gameLiftWebSocket.SendMessage(new UpdatePlayerSessionCreationPolicyRequest(gameSessionId, playerSessionPolicy));
+            return gameLiftWebSocket.sendMessage(new UpdatePlayerSessionCreationPolicyRequest(gameSessionId, playerSessionPolicy));
         }
 
-        public function  AcceptPlayerSession(string playerSessionId) : GenericOutcome
+        public function  AcceptPlayerSession( playerSessionId : String) : GenericOutcome
         {
-            if (string.IsNullOrEmpty(gameSessionId))
+            if (isNullOrEmpty(gameSessionId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
             }
 
-            return gameLiftWebSocket.SendMessage(new AcceptPlayerSessionRequest(gameSessionId, playerSessionId));
+            return gameLiftWebSocket.sendMessage(new AcceptPlayerSessionRequest(gameSessionId, playerSessionId));
         }
 
-        public function  RemovePlayerSession(string playerSessionId) : GenericOutcome
+        public function  RemovePlayerSession( playerSessionId : String) : GenericOutcome
         {
-            if (string.IsNullOrEmpty(gameSessionId))
+            if (isNullOrEmpty(gameSessionId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
             }
 
-            return gameLiftWebSocket.SendMessage(new RemovePlayerSessionRequest(gameSessionId, playerSessionId));
+            return gameLiftWebSocket.sendMessage(new RemovePlayerSessionRequest(gameSessionId, playerSessionId));
         }
 
-        public  DescribePlayerSessions(DescribePlayerSessionsRequest request) : DescribePlayerSessionsOutcome
+        public  function DescribePlayerSessions( request : DescribePlayerSessionsRequest) : DescribePlayerSessionsOutcome
         {
             if (request == null)
             {
@@ -147,73 +149,71 @@ class ServerState implements IWebSocketMessageHandler
             }
 
             // must have player session id or game session id or player id
-            if (string.IsNullOrEmpty(request.PlayerSessionId) && string.IsNullOrEmpty(request.GameSessionId) && string.IsNullOrEmpty(request.PlayerId))
+            if (isNullOrEmpty(request.playerSessionId) && isNullOrEmpty(request.gameSessionId) && isNullOrEmpty(request.playerId))
             {
                 return new DescribePlayerSessionsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "At least one of PlayerSessionId, GameSessionId and PlayerId is required."));
             }
 
-            GenericOutcome outcome = webSocketRequestHandler.SendRequest(request);
-            if (!outcome.Success)
+            var outcome = webSocketRequestHandler.SendRequest(request);
+            if (!outcome.success)
             {
-                return new DescribePlayerSessionsOutcome(outcome.Error);
+                return new DescribePlayerSessionsOutcome(outcome.error);
             }
 
-            return (DescribePlayerSessionsOutcome)outcome;
+            return cast(outcome, DescribePlayerSessionsOutcome);
         }
 
-        public StartMatchBackfillOutcome StartMatchBackfill(StartMatchBackfillRequest request)
+        public function StartMatchBackfill( request : StartMatchBackfillRequest) : StartMatchBackfillOutcome
         {
             if (request == null)
             {
                 return new StartMatchBackfillOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StartMatchBackfillRequest is required"));
             }
 
-            if (string.IsNullOrEmpty(request.GameSessionArn))
+            if (isNullOrEmpty(request.gameSessionArn))
             {
                 return new StartMatchBackfillOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "GameSessionArn is required in StartMatchBackfillRequest"));
             }
 
-            if (string.IsNullOrEmpty(request.MatchmakingConfigurationArn))
+            if (isNullOrEmpty(request.matchmakingConfigurationArn))
             {
                 return new StartMatchBackfillOutcome(new GameLiftError(
                     GameLiftErrorType.BAD_REQUEST_EXCEPTION,
                     "Invalid MatchmakingConfigurationArn request was passed to StopMatchBackfillRequest"));
             }
 
-            if (request.Players == null || request.Players.Length == 0)
+            if (request.players == null || request.players.length == 0)
             {
                 return new StartMatchBackfillOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "At least 1 Player is required in StartMatchBackfillRequest"));
             }
 
-            GenericOutcome outcome = webSocketRequestHandler.SendRequest(request);
-            if (!outcome.Success)
+            var outcome = webSocketRequestHandler.SendRequest(request);
+            if (!outcome.success)
             {
-                return new StartMatchBackfillOutcome(outcome.Error);
+                return new StartMatchBackfillOutcome(outcome.error);
             }
 
-            return (StartMatchBackfillOutcome)outcome;
+            return cast(outcome,StartMatchBackfillOutcome);
         }
 
-#pragma warning disable S3242
-        public GenericOutcome StopMatchBackfill(StopMatchBackfillRequest request)
-#pragma warning restore S3242
+        public function StopMatchBackfill( request : StopMatchBackfillRequest) : GenericOutcome
         {
             if (request == null)
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StopMatchBackfillRequest is required"));
             }
 
-            if (string.IsNullOrEmpty(request.GameSessionArn))
+            if (isNullOrEmpty(request.gameSessionArn))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "GameSessionArn is required in StopMatchBackfillRequest"));
             }
 
-            if (string.IsNullOrEmpty(request.MatchmakingConfigurationArn))
+            if (isNullOrEmpty(request.matchmakingConfigurationArn))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "MatchmakingConfigurationArn is required in StopMatchBackfillRequest"));
             }
 
-            if (string.IsNullOrEmpty(request.TicketId))
+            if (isNullOrEmpty(request.ticketId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "TicketId is required in StopMatchBackfillRequest"));
             }
@@ -221,45 +221,45 @@ class ServerState implements IWebSocketMessageHandler
             return webSocketRequestHandler.SendRequest(request);
         }
 
-        private void StartHealthCheck()
+        private function StartHealthCheck()
         {
-            Log.InfoFormat(
+            Log.info(
                 "Starting HealthCheck thread. GameLift Server SDK will report process health status to GameLift every: {0} seconds (plus random jitter of up to {1} seconds).",
                 HealthcheckIntervalSeconds,
                 HealthcheckMaxJitterSeconds);
-            while (processReady)
+            while (processIsReady)
             {
-                Task.Run(() => HeartbeatServerProcess());
-                Thread.Sleep(TimeSpan.FromSeconds(GetNextHealthCheckIntervalSeconds()));
+                Task.run(() -> HeartbeatServerProcess());
+                Sys.sleep(TimeSpan.fromSeconds(GetNextHealthCheckIntervalSeconds()));
             }
         }
 
-        private static double GetNextHealthCheckIntervalSeconds()
+        private static function GetNextHealthCheckIntervalSeconds() : Float
         {
             // Jitter the healthCheck interval +/- a random value between [-MAX_JITTER_SECONDS, MAX_JITTER_SECONDS]
-            double jitter = HealthcheckMaxJitterSeconds * (2 * Random.NextDouble() - 1);
+            var jitter = HealthcheckMaxJitterSeconds * (2 * Random.NextDouble() - 1);
             return HealthcheckIntervalSeconds + jitter;
         }
 
-        private async Task HeartbeatServerProcess()
+        private function HeartbeatServerProcess() : Task // async
         {
             // duplicate ProcessReady check here right before invoking
-            if (!processReady)
+            if (!processIsReady)
             {
-                Log.Debug("Reporting Health on an inactive process. Ignoring.");
+                Log.debug("Reporting Health on an inactive process. Ignoring.");
                 return;
             }
 
-            Log.Debug("Reporting health using the OnHealthCheck callback.");
+            Log.debug("Reporting health using the OnHealthCheck callback.");
 
-            bool healthCheckResult;
+            var healthCheckResult = false;
             try
             {
-                var healthCheckResultTask = Task.Run(() => processParameters.OnHealthCheck.Invoke());
-                var onHealthCheckCompleted = healthCheckResultTask.Wait(TimeSpan.FromSeconds(HealthcheckTimeoutSeconds));
+                var healthCheckResultTask = Task.run(() -> processParameters.OnHealthCheck.Invoke());
+                var onHealthCheckCompleted = healthCheckResultTask.Wait(TimeSpan.fromSeconds(HealthcheckTimeoutSeconds));
                 if (!onHealthCheckCompleted)
                 {
-                    Log.Warn("Timed out waiting for onHealthCheck callback to respond. Reporting process as unhealthy.");
+                    Log.warning("Timed out waiting for onHealthCheck callback to respond. Reporting process as unhealthy.");
                     healthCheckResult = false;
                 }
                 else
@@ -267,19 +267,19 @@ class ServerState implements IWebSocketMessageHandler
                     healthCheckResult = healthCheckResultTask.Result;
                     if (healthCheckResult)
                     {
-                        Log.Info("Received TRUE from the onHealthCheck callback. Reporting process as healthy.");
+                        Log.info("Received TRUE from the onHealthCheck callback. Reporting process as healthy.");
                     }
                     else
                     {
-                        Log.Warn("Received FALSE from the onHealthCheck callback. Reporting process as unhealthy.");
+                        Log.warning("Received FALSE from the onHealthCheck callback. Reporting process as unhealthy.");
                     }
                 }
             }
-            catch (AggregateException aex)
+            catch ( aex : AggregateException)
             {
-                if (aex.InnerExceptions.Any(ix => ix is TaskCanceledException))
+                if (aex.InnerExceptions.Any(ix -> ix is TaskCanceledException))
                 {
-                    Log.Warn("Healthcheck task cancelled. Reporting process as unhealthy.");
+                    Log.warning("Healthcheck task cancelled. Reporting process as unhealthy.");
                 }
                 else
                 {
@@ -289,39 +289,39 @@ class ServerState implements IWebSocketMessageHandler
                 healthCheckResult = false;
             }
 
-            HeartbeatServerProcessRequest request = new HeartbeatServerProcessRequest(healthCheckResult);
-            GenericOutcome outcome = webSocketRequestHandler.SendRequest(request);
-            if (!outcome.Success)
+            var request = new HeartbeatServerProcessRequest(healthCheckResult);
+            var outcome = webSocketRequestHandler.SendRequest(request);
+            if (!outcome.success)
             {
-                Log.WarnFormat("Failed to report health status to GameLift service. Error: {0}", outcome.Error);
+                Log.warningFormat("Failed to report health status to GameLift service. Error: {0}", outcome.error);
             }
         }
 
-        public GenericOutcome InitializeNetworking(ServerParameters serverParameters)
+        public function InitializeNetworking( serverParameters : ServerParameters) : GenericOutcome
         {
-            var websocketUrl = Environment.GetEnvironmentVariable(EnvironmentVariableWebsocketUrl) ?? serverParameters.WebSocketUrl;
-            processId = Environment.GetEnvironmentVariable(EnvironmentVariableProcessId) ?? serverParameters.ProcessId;
-            hostId = Environment.GetEnvironmentVariable(EnvironmentVariableHostId) ?? serverParameters.HostId;
-            fleetId = Environment.GetEnvironmentVariable(EnvironmentVariableFleetId) ?? serverParameters.FleetId;
-            var authToken = Environment.GetEnvironmentVariable(EnvironmentVariableAuthToken) ?? serverParameters.AuthToken;
+            var websocketUrl = getEnv(EnvironmentVariableWebsocketUrl) ?? serverParameters.webSocketUrl;
+            processId = getEnv(EnvironmentVariableProcessId) ?? serverParameters.processId;
+            hostId = getEnv(EnvironmentVariableHostId) ?? serverParameters.hostId;
+            fleetId = getEnv(EnvironmentVariableFleetId) ?? serverParameters.fleetId;
+            var authToken = getEnv(EnvironmentVariableAuthToken) ?? serverParameters.authToken;
             
-            if (string.IsNullOrEmpty(websocketUrl))
+            if (isNullOrEmpty(websocketUrl))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "websocketUrl is required in InitSDK ServerParameters"));
             }
-            if (string.IsNullOrEmpty(processId))
+            if (isNullOrEmpty(processId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "processId is required in InitSDK ServerParameters"));
             }
-            if (string.IsNullOrEmpty(hostId))
+            if (isNullOrEmpty(hostId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "hostId is required in InitSDK ServerParameters"));
             }
-            if (string.IsNullOrEmpty(fleetId))
+            if (isNullOrEmpty(fleetId))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "fleetId is required in InitSDK ServerParameters"));
             }
-            if (string.IsNullOrEmpty(authToken))
+            if (isNullOrEmpty(authToken))
             {
                 return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "authToken is required in InitSDK ServerParameters"));
             }
@@ -329,93 +329,93 @@ class ServerState implements IWebSocketMessageHandler
             return EstablishNetworking(websocketUrl, authToken);
         }
 
-        private GenericOutcome EstablishNetworking(string webSocketUrl, string authToken)
+        private function EstablishNetworking( webSocketUrl : String,  authToken : String) : GenericOutcome
         {
-            return gameLiftWebSocket.Connect(webSocketUrl, processId, hostId, fleetId, authToken);
+            return gameLiftWebSocket.connect(webSocketUrl, processId, hostId, fleetId, authToken);
         }
 
-        public GetComputeCertificateOutcome GetComputeCertificate()
+        public function  GetComputeCertificate() : GetComputeCertificateOutcome
         {
-            Log.DebugFormat("Calling GetComputeCertificate");
+            Log.debug("Calling GetComputeCertificate");
 
-            GetComputeCertificateRequest webSocketRequest = new GetComputeCertificateRequest();
-            GenericOutcome outcome = webSocketRequestHandler.SendRequest(webSocketRequest);
-            if (!outcome.Success)
+            var webSocketRequest = new GetComputeCertificateRequest();
+            var outcome = webSocketRequestHandler.SendRequest(webSocketRequest);
+            if (!outcome.success)
             {
-                return new GetComputeCertificateOutcome(outcome.Error);
+                return new GetComputeCertificateOutcome(outcome.error);
             }
 
-            return (GetComputeCertificateOutcome)outcome;
+            return outcome;
         }
 
-        public GetFleetRoleCredentialsOutcome GetFleetRoleCredentials(GetFleetRoleCredentialsRequest request)
+        public  function GetFleetRoleCredentials( request : GetFleetRoleCredentialsRequest) : GetFleetRoleCredentialsOutcome
         {
-            Log.DebugFormat("Calling GetFleetRoleCredentials: {0}", request);
+            Log.debug("Calling GetFleetRoleCredentials: {0}", request);
 
             // If we've decided we're not on managed EC2, fail without making an APIGW call
             if (!onManagedEc2)
             {
-                Log.DebugFormat("SDK is not running on managed EC2, fast-failing the request");
+                Log.debug("SDK is not running on managed EC2, fast-failing the request");
                 return new GetFleetRoleCredentialsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION));
             }
 
             // Check if we're cached credentials recently that still have at least 15 minutes before expiration
-            if (instanceRoleResultCache.ContainsKey(request.RoleArn))
+            if (instanceRoleResultCache.exists(request.roleArn))
             {
-                var previousResult = instanceRoleResultCache[request.RoleArn];
-                if (previousResult.Expiration.Subtract(InstanceRoleCredentialTtlMin) > DateTime.UtcNow)
+                var previousResult = instanceRoleResultCache[request.roleArn];
+                if (previousResult.expiration.Subtract(InstanceRoleCredentialTtlMin) > DateTime.UtcNow)
                 {
-                    Log.DebugFormat("Returning cached credentials which expire in {0} seconds", (previousResult.Expiration - DateTime.UtcNow).Seconds);
+                    Log.debug("Returning cached credentials which expire in {0} seconds", (previousResult.Expiration - DateTime.UtcNow).Seconds);
                     return new GetFleetRoleCredentialsOutcome(previousResult);
                 }
 
-                instanceRoleResultCache.Remove(request.RoleArn);
+                instanceRoleResultCache.remove(request.roleArn);
             }
 
             // If role session name was not provided, default to fleetId-hostId
-            if (request.RoleSessionName.IsNullOrEmpty())
+            if (isNullOrEmpty(request.roleSessionName))
             {
-                var generatedRoleSessionName = $"{fleetId}-{hostId}";
-                if (generatedRoleSessionName.Length > RoleSessionNameMaxLength)
+                var generatedRoleSessionName = '${fleetId}-${hostId}';
+                if (generatedRoleSessionName.length > RoleSessionNameMaxLength)
                 {
-                    generatedRoleSessionName = generatedRoleSessionName.Substring(0, RoleSessionNameMaxLength);
+                    generatedRoleSessionName = generatedRoleSessionName.substring(0, RoleSessionNameMaxLength);
                 }
 
-                request.RoleSessionName = generatedRoleSessionName;
+                request.roleSessionName = generatedRoleSessionName;
             }
 
             // Role session name cannot be over 64 chars (enforced by IAM's AssumeRole API)
-            if (request.RoleSessionName.Length > RoleSessionNameMaxLength)
+            if (request.roleSessionName.length > RoleSessionNameMaxLength)
             {
                 return new GetFleetRoleCredentialsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION));
             }
 
             var rawOutcome = webSocketRequestHandler.SendRequest(request);
-            if (!rawOutcome.Success)
+            if (!rawOutcome.success)
             {
-                return new GetFleetRoleCredentialsOutcome(rawOutcome.Error);
+                return new GetFleetRoleCredentialsOutcome(rawOutcome.error);
             }
 
-            var outcome = (GetFleetRoleCredentialsOutcome)rawOutcome;
-            var result = outcome.Result;
+            var outcome : GetFleetRoleCredentialsOutcome = cast(rawOutcome,GetFleetRoleCredentialsOutcome);
+            var result = outcome.result;
 
             // If we get a success response from APIGW with empty fields we're not on managed EC2
-            if (result.AccessKeyId == string.Empty)
+            if (isNullOrEmpty(result.accessKeyId))
             {
                 onManagedEc2 = false;
                 return new GetFleetRoleCredentialsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION));
             }
 
-            instanceRoleResultCache[request.RoleArn] = result;
+            instanceRoleResultCache[request.roleArn] = result;
             return outcome;
         }
 
-        public void OnErrorResponse(string requestId, int statusCode, string errorMessage)
+        public function OnErrorResponse( requestId : String,  statusCode : Int,  errorMessage : String)
         {
             webSocketRequestHandler.HandleResponse(requestId, new GenericOutcome(new GameLiftError(statusCode, errorMessage)));
         }
 
-        public void OnSuccessResponse(string requestId)
+        public function OnSuccessResponse( requestId : String)
         {
             if (requestId != null)
             {
@@ -423,86 +423,86 @@ class ServerState implements IWebSocketMessageHandler
             }
             else
             {
-                Log.Info("RequestId was null");
+                Log.info("RequestId was null");
             }
         }
 
-        public void OnStartGameSession(GameSession gameSession)
+        public function OnStartGameSession( gameSession : GameSession)
         {
             // Inject data that already exists on the server
-            gameSession.FleetId = fleetId;
+            gameSession.fleetId = fleetId;
 
-            Log.DebugFormat("ServerState got the startGameSession signal. GameSession : {0}", gameSession);
+            Log.debug('ServerState got the startGameSession signal. GameSession : ${gameSession}');
 
-            if (!processReady)
+            if (!processIsReady)
             {
-                Log.Debug("Got a game session on inactive process. Ignoring.");
+                Log.debug("Got a game session on inactive process. Ignoring.");
                 return;
             }
 
-            gameSessionId = gameSession.GameSessionId;
+            gameSessionId = gameSession.gameSessionId;
 
-            Task.Run(() =>
+            Task.run(() ->
             {
-                processParameters.OnStartGameSession(gameSession);
+                processParameters.onStartGameSession(gameSession);
             });
         }
 
-        public void OnUpdateGameSession(GameSession gameSession, UpdateReason updateReason, string backfillTicketId)
+        public function OnUpdateGameSession( gameSession : GameSession,  updateReason : UpdateReason,  backfillTicketId : String)
         {
-            Log.DebugFormat("ServerState got the updateGameSession signal. GameSession : {0}", gameSession);
+            Log.debug('ServerState got the updateGameSession signal. GameSession : ${gameSession}');
 
-            if (!processReady)
+            if (!processIsReady)
             {
-                Log.Warn("Got an updated game session on inactive process.");
+                Log.warning("Got an updated game session on inactive process.");
                 return;
             }
 
-            Task.Run(() =>
+            Task.run(() ->
             {
-                processParameters.OnUpdateGameSession(new UpdateGameSession(gameSession, updateReason, backfillTicketId));
+                processParameters.onUpdateGameSession(new UpdateGameSession(gameSession, updateReason, backfillTicketId));
             });
         }
 
-        public void OnTerminateProcess(long terminationTime)
+        public function OnTerminateProcess( terminationTime : Float)
         {
             // TerminationTime is milliseconds that have elapsed since Unix epoch time begins (00:00:00 UTC Jan 1 1970).
-            this.terminationTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(terminationTime);
+            this.terminationTime = new Date(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(terminationTime);
 
-            Log.DebugFormat("ServerState got the terminateProcess signal. termination time : {0}", this.terminationTime);
+            Log.debug('ServerState got the terminateProcess signal. termination time : ${this.terminationTime}' );
 
-            Task.Run(() =>
+            Task.run(() ->
             {
-                processParameters.OnProcessTerminate();
+                processParameters.onProcessTerminate();
             });
         }
 
-        public void OnStartMatchBackfillResponse(string requestId, string ticketId)
+        public function OnStartMatchBackfillResponse(requestId : String,  ticketId : String)
         {
-            StartMatchBackfillResult result = new StartMatchBackfillResult(ticketId);
+            var result = new StartMatchBackfillResult(ticketId);
             webSocketRequestHandler.HandleResponse(requestId, new StartMatchBackfillOutcome(result));
         }
 
-        public void OnDescribePlayerSessionsResponse(string requestId, IList<PlayerSession> playerSessions, string nextToken)
+        public function OnDescribePlayerSessionsResponse(requestId : String,  playerSessions : Array<PlayerSession>,  nextToken : String)
         {
-            DescribePlayerSessionsResult result = new DescribePlayerSessionsResult(playerSessions, nextToken);
+            var result = new DescribePlayerSessionsResult(playerSessions, nextToken);
             webSocketRequestHandler.HandleResponse(requestId, new DescribePlayerSessionsOutcome(result));
         }
 
-        public void OnGetComputeCertificateResponse(string requestId, string certificatePath, string computeName)
+        public function OnGetComputeCertificateResponse(requestId : String,  certificatePath : String,  computeName : String)
         {
-            GetComputeCertificateResult result = new GetComputeCertificateResult(certificatePath, computeName);
-            webSocketRequestHandler.HandleResponse(requestId, new GetComputeCertificateOutcome(result));
+            var result = new GetComputeCertificateResult(certificatePath, computeName);
+            webSocketRequestHandler.HandleResponse(requestId, new GetComputeCertificateOutcome(null, result));
         }
 
-        public void OnGetFleetRoleCredentialsResponse(
-            string requestId,
-            string assumedRoleUserArn,
-            string assumedRoleId,
-            string accessKeyId,
-            string secretAccessKey,
-            string sessionToken,
-            long expiration)
+        public function OnGetFleetRoleCredentialsResponse(
+            requestId : String,
+            assumedRoleUserArn : String,
+            assumedRoleId : String,
+            accessKeyId : String,
+            secretAccessKey : String,
+            sessionToken : String,
+             expiration : Float)
         {
             var result = new GetFleetRoleCredentialsResult(
                 assumedRoleUserArn,
@@ -510,30 +510,28 @@ class ServerState implements IWebSocketMessageHandler
                 accessKeyId,
                 secretAccessKey,
                 sessionToken,
-                Epoch.AddMilliseconds(expiration));
-            webSocketRequestHandler.HandleResponse(requestId, new GetFleetRoleCredentialsOutcome(result));
+                Epoch.addMilliseconds(expiration));
+            webSocketRequestHandler.HandleResponse(requestId, new GetFleetRoleCredentialsOutcome(null, result));
         }
 
-        public void OnRefreshConnection(string refreshConnectionEndpoint, string authToken)
+        public function OnRefreshConnection( refreshConnectionEndpoint : String,  authToken : String)
         {
             var outcome = EstablishNetworking(refreshConnectionEndpoint, authToken);
 
-            if (!outcome.Success)
+            if (!outcome.success)
             {
-                Log.ErrorFormat(
-                    "Failed to refresh websocket connection. The GameLift SDK will try again each minute until the refresh succeeds, or the websocket is forcibly closed. {0}",
-                    outcome.Error);
+                Log.error('Failed to refresh websocket connection. The GameLift SDK will try again each minute until the refresh succeeds, or the websocket is forcibly closed. ${outcome.error}');
             }
         }
 
-        public void Shutdown()
+        public function Shutdown()
         {
-            processReady = false;
+            processIsReady = false;
 
             // Sleep thread for 1 sec.
             // This is to help deal with race conditions related to processReady flag being turned off (i.e. HeartbeatServerProcess)
-            Thread.Sleep(TimeSpan.FromSeconds(1).Milliseconds);
+            Sys.sleep(TimeSpan.fromSeconds(1).Milliseconds);
 
-            gameLiftWebSocket.Disconnect();
+            gameLiftWebSocket.disconnect();
         }
     }

@@ -1,5 +1,5 @@
 package aws.gamelift.server.model;
-
+import aws.gamelift.ILog;
 /// <summary>
     /// Provides a list of requested player session objects.
     /// </summary>
@@ -7,7 +7,7 @@ package aws.gamelift.server.model;
     {
         private static final MaxPlayerSessions = 1024;
 
-        //public static ILog Log { get; } = LogManager.GetLogger(typeof(ServerState));
+        public static final Log : ILog = LogManager.GetLogger(Type.typeof(ServerState));
 
         public var nextToken : String;
 

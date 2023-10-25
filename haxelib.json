@@ -9,7 +9,10 @@
     "releasenote": "Initial release",
     "contributors": ["onehundredfeet" ],
     "dependencies": {
-        "uuid": ""
+        "uuid": "",
+        "seedyrng": "",
+        "hxWebSockets": "",
+        "haxe-concurrent": ""
       }
   }
   
