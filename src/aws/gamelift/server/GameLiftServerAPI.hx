@@ -108,7 +108,7 @@ class GameLiftServerAPI {
 	/// </example>
 
 	public static function ProcessReady(processParameters:ProcessParameters):GenericOutcome {
-		return ServerState.instance.ProcessReady(processParameters);
+		return ServerState.instance.processReady(processParameters);
 	}
 
 	/// <summary>

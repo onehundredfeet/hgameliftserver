@@ -8,7 +8,7 @@ class GetComputeCertificateOutcome extends GenericOutcome
         public var result : GetComputeCertificateResult;
 
 
-        public function new( error : GameLiftError,  result : GetComputeCertificateResult)
+        public function new( error : GameLiftError,  result : GetComputeCertificateResult = null)
         {
             super(error);
             this.result = result;

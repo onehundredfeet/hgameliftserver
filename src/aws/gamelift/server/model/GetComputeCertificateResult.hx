@@ -6,7 +6,6 @@ package aws.gamelift.server.model;
      class GetComputeCertificateResult
     {
         public var certificatePath : String;
-
         public var computeName : String;
 
         public function new( certificatePath : String,  computeName : String)

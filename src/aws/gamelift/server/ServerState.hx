@@ -24,7 +24,7 @@ class ServerState implements IWebSocketMessageHandler
         private static final RoleSessionNameMaxLength = 64;
         private static final HealthcheckIntervalSeconds = 60.0;
         private static final HealthcheckMaxJitterSeconds = 10.0;
-        private static final HealthcheckTimeoutSeconds = HealthcheckIntervalSeconds - HealthcheckMaxJitterSeconds;
+        private static final HealthcheckTimeoutSeconds : Int = Math.round(HealthcheckIntervalSeconds - HealthcheckMaxJitterSeconds);
         private static final SdkLanguage = "CSharp";
 
         private static final Epoch : Date = new Date(1970, 1, 1, 0, 0, 0);
@@ -64,7 +64,7 @@ class ServerState implements IWebSocketMessageHandler
             processParameters = procParameters;
 
             var result = gameLiftWebSocket.sendMessage(new ActivateServerProcessRequest(
-                GameLiftServerAPI.GetSdkVersion().Result, SdkLanguage, processParameters.Port, processParameters.LogParameters.LogPaths));
+                GameLiftServerAPI.GetSdkVersion().result, SdkLanguage, processParameters.port, processParameters.logParameters.LogPaths));
 
             Task.run(() -> StartHealthCheck());
 
@@ -103,7 +103,7 @@ class ServerState implements IWebSocketMessageHandler
 
         public function  GetTerminationTime() : AwsDateTimeOutcome
         {
-            if (terminationTime == DateTime.MinValue)
+            if (terminationTime.getTime() == Date.fromTime(0.0).getTime())
             {
                 return new AwsDateTimeOutcome(new GameLiftError(GameLiftErrorType.TERMINATION_TIME_NOT_SET));
             }
@@ -223,10 +223,8 @@ class ServerState implements IWebSocketMessageHandler
 
         private function StartHealthCheck()
         {
-            Log.info(
-                "Starting HealthCheck thread. GameLift Server SDK will report process health status to GameLift every: {0} seconds (plus random jitter of up to {1} seconds).",
-                HealthcheckIntervalSeconds,
-                HealthcheckMaxJitterSeconds);
+            Log.info('Starting HealthCheck thread. GameLift Server SDK will report process health status to GameLift every: ${HealthcheckIntervalSeconds} seconds (plus random jitter of up to ${HealthcheckMaxJitterSeconds} seconds).');
+
             while (processIsReady)
             {
                 Task.run(() -> HeartbeatServerProcess());
@@ -237,7 +235,7 @@ class ServerState implements IWebSocketMessageHandler
         private static function GetNextHealthCheckIntervalSeconds() : Float
         {
             // Jitter the healthCheck interval +/- a random value between [-MAX_JITTER_SECONDS, MAX_JITTER_SECONDS]
-            var jitter = HealthcheckMaxJitterSeconds * (2 * Random.NextDouble() - 1);
+            var jitter = HealthcheckMaxJitterSeconds * (2 * random.random() - 1);
             return HealthcheckIntervalSeconds + jitter;
         }
 
@@ -255,8 +253,8 @@ class ServerState implements IWebSocketMessageHandler
             var healthCheckResult = false;
             try
             {
-                var healthCheckResultTask = Task.run(() -> processParameters.OnHealthCheck.Invoke());
-                var onHealthCheckCompleted = healthCheckResultTask.Wait(TimeSpan.fromSeconds(HealthcheckTimeoutSeconds));
+                var healthCheckResultTask = Task.run(() -> processParameters.onHealthCheck());
+                var onHealthCheckCompleted = healthCheckResultTask.wait(TimeSpan.fromSeconds(HealthcheckTimeoutSeconds));
                 if (!onHealthCheckCompleted)
                 {
                     Log.warning("Timed out waiting for onHealthCheck callback to respond. Reporting process as unhealthy.");
@@ -277,13 +275,13 @@ class ServerState implements IWebSocketMessageHandler
             }
             catch ( aex : AggregateException)
             {
-                if (aex.InnerExceptions.Any(ix -> ix is TaskCanceledException))
+                if (aex.innerExceptions.any(ix -> ix is TaskCanceledException))
                 {
                     Log.warning("Healthcheck task cancelled. Reporting process as unhealthy.");
                 }
                 else
                 {
-                    Log.Error("Encountered unexpected error when calling onHealthCheck callback. Reporting process as unhealthy.", aex);
+                    Log.error("Encountered unexpected error when calling onHealthCheck callback. Reporting process as unhealthy.");
                 }
 
                 healthCheckResult = false;
@@ -293,7 +291,7 @@ class ServerState implements IWebSocketMessageHandler
             var outcome = webSocketRequestHandler.SendRequest(request);
             if (!outcome.success)
             {
-                Log.warningFormat("Failed to report health status to GameLift service. Error: {0}", outcome.error);
+                Log.warning('Failed to report health status to GameLift service. Error: ${outcome.error}' );
             }
         }
 
@@ -345,12 +343,12 @@ class ServerState implements IWebSocketMessageHandler
                 return new GetComputeCertificateOutcome(outcome.error);
             }
 
-            return outcome;
+            return cast(outcome, GetComputeCertificateOutcome);
         }
 
         public  function GetFleetRoleCredentials( request : GetFleetRoleCredentialsRequest) : GetFleetRoleCredentialsOutcome
         {
-            Log.debug("Calling GetFleetRoleCredentials: {0}", request);
+            Log.debug('Calling GetFleetRoleCredentials: ${request}');
 
             // If we've decided we're not on managed EC2, fail without making an APIGW call
             if (!onManagedEc2)
@@ -363,7 +361,7 @@ class ServerState implements IWebSocketMessageHandler
             if (instanceRoleResultCache.exists(request.roleArn))
             {
                 var previousResult = instanceRoleResultCache[request.roleArn];
-                if (previousResult.expiration.Subtract(InstanceRoleCredentialTtlMin) > DateTime.UtcNow)
+                if (previousResult.expiration.Subtract(InstanceRoleCredentialTtlMin) > Date.now())
                 {
                     Log.debug("Returning cached credentials which expire in {0} seconds", (previousResult.Expiration - DateTime.UtcNow).Seconds);
                     return new GetFleetRoleCredentialsOutcome(previousResult);
@@ -410,12 +408,12 @@ class ServerState implements IWebSocketMessageHandler
             return outcome;
         }
 
-        public function OnErrorResponse( requestId : String,  statusCode : Int,  errorMessage : String)
+        public function onErrorResponse( requestId : String,  statusCode : Int,  errorMessage : String)
         {
             webSocketRequestHandler.HandleResponse(requestId, new GenericOutcome(new GameLiftError(statusCode, errorMessage)));
         }
 
-        public function OnSuccessResponse( requestId : String)
+        public function onSuccessResponse( requestId : String)
         {
             if (requestId != null)
             {
@@ -427,7 +425,7 @@ class ServerState implements IWebSocketMessageHandler
             }
         }
 
-        public function OnStartGameSession( gameSession : GameSession)
+        public function onStartGameSession( gameSession : GameSession)
         {
             // Inject data that already exists on the server
             gameSession.fleetId = fleetId;
@@ -448,7 +446,7 @@ class ServerState implements IWebSocketMessageHandler
             });
         }
 
-        public function OnUpdateGameSession( gameSession : GameSession,  updateReason : UpdateReason,  backfillTicketId : String)
+        public function onUpdateGameSession( gameSession : GameSession,  updateReason : UpdateReason,  backfillTicketId : String)
         {
             Log.debug('ServerState got the updateGameSession signal. GameSession : ${gameSession}');
 
@@ -464,10 +462,11 @@ class ServerState implements IWebSocketMessageHandler
             });
         }
 
-        public function OnTerminateProcess( terminationTime : Float)
+        public function onTerminateProcess( terminationTime : Float)
         {
             // TerminationTime is milliseconds that have elapsed since Unix epoch time begins (00:00:00 UTC Jan 1 1970).
-            this.terminationTime = new Date(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(terminationTime);
+            //this.terminationTime = new Date(1970, 1, 1, 0, 0, 0).addMilliseconds(terminationTime); // DateTimeKind.Utc
+            this.terminationTime = Date.fromTime(terminationTime); // milliseconds
 
             Log.debug('ServerState got the terminateProcess signal. termination time : ${this.terminationTime}' );
 
@@ -477,32 +476,32 @@ class ServerState implements IWebSocketMessageHandler
             });
         }
 
-        public function OnStartMatchBackfillResponse(requestId : String,  ticketId : String)
+        public function onStartMatchBackfillResponse(requestId : String,  ticketId : String)
         {
             var result = new StartMatchBackfillResult(ticketId);
             webSocketRequestHandler.HandleResponse(requestId, new StartMatchBackfillOutcome(result));
         }
 
-        public function OnDescribePlayerSessionsResponse(requestId : String,  playerSessions : Array<PlayerSession>,  nextToken : String)
+        public function onDescribePlayerSessionsResponse(requestId : String,  playerSessions : Array<PlayerSession>,  nextToken : String)
         {
             var result = new DescribePlayerSessionsResult(playerSessions, nextToken);
             webSocketRequestHandler.HandleResponse(requestId, new DescribePlayerSessionsOutcome(result));
         }
 
-        public function OnGetComputeCertificateResponse(requestId : String,  certificatePath : String,  computeName : String)
+        public function onGetComputeCertificateResponse(requestId : String,  certificatePath : String,  computeName : String)
         {
             var result = new GetComputeCertificateResult(certificatePath, computeName);
             webSocketRequestHandler.HandleResponse(requestId, new GetComputeCertificateOutcome(null, result));
         }
 
-        public function OnGetFleetRoleCredentialsResponse(
+        public function onGetFleetRoleCredentialsResponse(
             requestId : String,
             assumedRoleUserArn : String,
             assumedRoleId : String,
             accessKeyId : String,
             secretAccessKey : String,
             sessionToken : String,
-             expiration : Float)
+             expirationMS : Float)
         {
             var result = new GetFleetRoleCredentialsResult(
                 assumedRoleUserArn,
@@ -510,11 +509,11 @@ class ServerState implements IWebSocketMessageHandler
                 accessKeyId,
                 secretAccessKey,
                 sessionToken,
-                Epoch.addMilliseconds(expiration));
+                Date.fromTime(expirationMS));
             webSocketRequestHandler.HandleResponse(requestId, new GetFleetRoleCredentialsOutcome(null, result));
         }
 
-        public function OnRefreshConnection( refreshConnectionEndpoint : String,  authToken : String)
+        public function onRefreshConnection( refreshConnectionEndpoint : String,  authToken : String)
         {
             var outcome = EstablishNetworking(refreshConnectionEndpoint, authToken);
 

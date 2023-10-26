@@ -154,92 +154,92 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 		};
 
 		newSocket.onmessage = (message: Dynamic) -> {
-			if (e.IsPing) {
+			if (message.IsPing) {
 				Log.debug("Received ping from GameLift websocket server.");
 				return;
 			}
 
-			if (!e.IsText) {
-				Log.warning("Unknown Data received. Data: {0}", e.Data);
+			if (!message.IsText) {
+				Log.warning('Unknown Data received. Data: ${message}');
 				return;
 			}
 
 			try {
 				// Parse message as a response message. This has error fields in it which will be null for a
 				// successful response or generic message not associated with a request.
-				var message:ResponseMessage = haxe.Json.parse(e.Data);
+				var message:ResponseMessage = haxe.Json.parse(message);
 				if (message == null) {
-					Log.error('could not parse message. Data: ${e.Data}');
+					Log.error('could not parse message. Data: ${message}');
 					return;
 				}
 
-				Log.info('Received ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${e.Data}');
+				Log.info('Received ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
 
 				// It's safe to cast enums to ints in C#. Each HttpStatusCode enum is associated with its numerical
 				// status code. RequestId will be null when we get a message not associated with a request.
 				if (message.StatusCode != HttpStatusCode.OK && message.RequestId != null) {
 					Log.warning("Received unsuccessful status code {0} for request {1} with message '{2}'", message.StatusCode, message.RequestId,
 						message.ErrorMessage);
-					handler.OnErrorResponse(message.RequestId, message.StatusCode, message.ErrorMessage);
+					handler.onErrorResponse(message.RequestId, message.StatusCode, message.ErrorMessage);
 					return;
 				}
 
 				switch (message.Action) {
 					case MessageActions.CreateGameSession:
 						{
-							var createGameSessionMessage:CreateGameSessionMessage = JsonConvert.DeserializeObject<CreateGameSessionMessage>(e.Data);
+							var createGameSessionMessage:CreateGameSessionMessage = JsonConvert.DeserializeObject<CreateGameSessionMessage>(message);
 							var gameSession = new GameSession(createGameSessionMessage);
-							handler.OnStartGameSession(gameSession);
+							handler.onStartGameSession(gameSession);
 						}
 
 					case MessageActions.UpdateGameSession:
 						{
 							var updateGameSessionMessage:UpdateGameSessionMessage = JsonConvert.DeserializeObject<UpdateGameSessionMessage>(e.Data);
-							handler.OnUpdateGameSession(updateGameSessionMessage.GameSession,
+							handler.onUpdateGameSession(updateGameSessionMessage.GameSession,
 								UpdateReasonMapper.GetUpdateReasonForName(updateGameSessionMessage.UpdateReason), updateGameSessionMessage.BackfillTicketId);
 						}
 
 					case MessageActions.TerminateProcess:
 						{
 							var terminateProcessMessage:TerminateProcessMessage = JsonConvert.DeserializeObject<TerminateProcessMessage>(e.Data);
-							handler.OnTerminateProcess(terminateProcessMessage.TerminationTime);
+							handler.onTerminateProcess(terminateProcessMessage.TerminationTime);
 						}
 
 					case MessageActions.StartMatchBackfill:
 						{
 							var startMatchBackfillResponse:StartMatchBackfillResponse = JsonConvert.DeserializeObject<StartMatchBackfillResponse>(e.Data);
-							handler.OnStartMatchBackfillResponse(startMatchBackfillResponse.RequestId, startMatchBackfillResponse.TicketId);
+							handler.onStartMatchBackfillResponse(startMatchBackfillResponse.RequestId, startMatchBackfillResponse.TicketId);
 						}
 
 					case MessageActions.DescribePlayerSessions:
 						{
 							var describePlayerSessionsResponse:DescribePlayerSessionsResponse = JsonConvert.DeserializeObject<DescribePlayerSessionsResponse>(e.Data); // new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore })
-							handler.OnDescribePlayerSessionsResponse(describePlayerSessionsResponse.RequestId, describePlayerSessionsResponse.PlayerSessions,
+							handler.onDescribePlayerSessionsResponse(describePlayerSessionsResponse.RequestId, describePlayerSessionsResponse.PlayerSessions,
 								describePlayerSessionsResponse.NextToken);
 						}
 
 					case MessageActions.GetComputeCertificate:
 						{
 							var getComputeCertificateResponse:GetComputeCertificateResponse = JsonConvert.DeserializeObject<GetComputeCertificateResponse>(e.Data);
-							handler.OnGetComputeCertificateResponse(getComputeCertificateResponse.RequestId, getComputeCertificateResponse.CertificatePath,
+							handler.onGetComputeCertificateResponse(getComputeCertificateResponse.RequestId, getComputeCertificateResponse.CertificatePath,
 								getComputeCertificateResponse.ComputeName);
 						}
 
 					case MessageActions.GetFleetRoleCredentials:
 						{
 							var response:GetFleetRoleCredentialsResponse = haxe.Json.parse(e.Data);
-							handler.OnGetFleetRoleCredentialsResponse(response.RequestId, response.AssumedRoleUserArn, response.AssumedRoleId,
+							handler.onGetFleetRoleCredentialsResponse(response.RequestId, response.AssumedRoleUserArn, response.AssumedRoleId,
 								response.AccessKeyId, response.SecretAccessKey, response.SessionToken, response.Expiration);
 						}
 
 					case MessageActions.RefreshConnection:
 						{
 							var refreshConnectionMessage:RefreshConnectionMessage = haxe.Json.parse(e.Data);
-							handler.OnRefreshConnection(refreshConnectionMessage.RefreshConnectionEndpoint, refreshConnectionMessage.AuthToken);
+							handler.onRefreshConnection(refreshConnectionMessage.RefreshConnectionEndpoint, refreshConnectionMessage.AuthToken);
 						}
 
 					default:
-						handler.OnSuccessResponse(message.RequestId);
+						handler.onSuccessResponse(message.RequestId);
 				}
 			} catch (ex:Exception) {
 				Log.error('could not parse message. Data: ${ex.Data}');
