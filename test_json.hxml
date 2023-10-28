@@ -1,0 +1,6 @@
+common.hxml
+--main JsonTest
+#--hl bin/JsonTest.hl
+--js bin/JsonTest.js
+--dce full
+

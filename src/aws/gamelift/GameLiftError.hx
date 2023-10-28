@@ -12,7 +12,7 @@
 
 package aws.gamelift;
 
-enum abstract GameLiftErrorType(Int) {
+enum abstract GameLiftErrorType(Int) from Int{
 	var GAMESESSION_ID_NOT_SET = 0; // No game sessions are bound to this process.
 	var SERVICE_CALL_FAILED; // A call to an AWS service has failed.
 	var BAD_REQUEST_EXCEPTION;

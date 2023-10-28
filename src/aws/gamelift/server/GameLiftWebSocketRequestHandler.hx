@@ -6,6 +6,7 @@ import hx.concurrent.collection.SynchronizedMap;
 import aws.gamelift.Util;
 import aws.gamelift.GameLiftError;
 using aws.gamelift.Extensions;
+import aws.gamelift.server.model.Messages;
 
 class GameLiftWebSocketRequestHandler {
 	private static inline final ServiceCallTimeoutMillis = 20000;
@@ -27,25 +28,25 @@ class GameLiftWebSocketRequestHandler {
 	 * Takes in a request and timeout and sends the request to our APIG via GameLiftWebSocket.
 	 */
 	public function SendRequest(request:Message, timeoutMillis:Int = ServiceCallTimeoutMillis):GenericOutcome {
-		if (isNullOrEmpty(request.requestId)) {
+		if (isNullOrEmpty(request.RequestId)) {
 			Log.error("Request does not have request ID, cannot process.");
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.INTERNAL_SERVICE_EXCEPTION));
 		}
 		var promise = new TaskCompletionSource<GenericOutcome>();
-		if (!requestIdToPromise.trySet(request.requestId, promise)) {
-			Log.error('Request ${request.requestId} already exists.');
+		if (!requestIdToPromise.trySet(request.RequestId, promise)) {
+			Log.error('Request ${request.RequestId} already exists.');
 			promise.setCanceled();
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.INTERNAL_SERVICE_EXCEPTION));
 		}
 		var outcome = gameLiftWebSocket.sendMessage(request);
 		if (!outcome.success) {
 			promise.setCanceled();
-			RemovePromise(request.requestId);
+			RemovePromise(request.RequestId);
 			return outcome;
 		}
 		if (!promise.task.wait(timeoutMillis)) {
-			Log.error('Response not received within time limit for request ${request.requestId}.');
-			if (RemovePromise(request.requestId) != null) {
+			Log.error('Response not received within time limit for request ${request.RequestId}.');
+			if (RemovePromise(request.RequestId) != null) {
 				promise.setCanceled();
 			}
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.WEBSOCKET_CONNECT_FAILURE_TIMEOUT));
@@ -58,7 +59,7 @@ class GameLiftWebSocketRequestHandler {
 	 * promise will then receive the result. Returns true if promise was resolved with result, false otherwise
 	 * (e.g. requestId not found).
 	 */
-	public function HandleResponse(requestId:String, result:GenericOutcome) {
+	public function handleResponse(requestId:String, result:GenericOutcome) {
         var promise = RemovePromise(requestId);
 		if (promise != null) {
 			promise.setResult(result);

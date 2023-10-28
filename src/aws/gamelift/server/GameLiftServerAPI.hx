@@ -15,6 +15,7 @@ package aws.gamelift.server;
 import aws.gamelift.GenericOutcome;
 import aws.gamelift.server.model.PlayerSessionCreationPolicy;
 import aws.gamelift.server.model.*;
+import aws.gamelift.server.model.Messages;
 
 // Name should be "GameLiftServerApi" by C# standard
 class GameLiftServerAPI {
@@ -459,5 +460,9 @@ class GameLiftServerAPI {
 	public static function Destroy():GenericOutcome {
 		ServerState.instance.Shutdown();
 		return new GenericOutcome();
+	}
+
+	public static function tick( delta : Float):Void {
+		ServerState.instance.tick(delta);
 	}
 }

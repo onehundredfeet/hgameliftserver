@@ -1,5 +1,5 @@
 package aws.gamelift;
-import aws.gamelift.server.model.Message;
+import aws.gamelift.server.model.Messages;
 
 interface IGameLiftWebSocket {
     function sendMessage(message : Message) : GenericOutcome;

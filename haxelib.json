@@ -12,7 +12,9 @@
         "uuid": "",
         "seedyrng": "",
         "hxWebSockets": "",
-        "haxe-concurrent": ""
+        "haxe-concurrent": "",
+        "hxnodejs": "",
+        "json2object": ""
       }
   }
   

@@ -1,13 +1,13 @@
 package aws.gamelift.server.model;
 
-enum abstract UpdateReason(Int) {
-	var MATCHMAKING_DATA_UPDATED = 0;
-	var BACKFILL_FAILED;
-	var BACKFILL_TIMED_OUT;
-	var BACKFILL_CANCELLED;
-	var UNKNOWN;
+enum abstract UpdateReason(String) from String to String {
+	var MATCHMAKING_DATA_UPDATED = "MATCHMAKING_DATA_UPDATED";
+	var BACKFILL_FAILED = "BACKFILL_FAILED";
+	var BACKFILL_TIMED_OUT = "BACKFILL_TIMED_OUT";
+	var BACKFILL_CANCELLED = "BACKFILL_CANCELLED";
+	var UNKNOWN = "UNKNOWN";
 }
-
+/*
 class UpdateReasonMapper {
 	private static final MatchmakingDataUpdatedReason = "MATCHMAKING_DATA_UPDATED";
 	private static final BackfillFailedReason = "BACKFILL_FAILED";
@@ -45,3 +45,4 @@ class UpdateReasonMapper {
 		}
 	}
 }
+*/

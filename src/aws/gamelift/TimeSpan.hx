@@ -14,6 +14,10 @@ abstract TimeSpan(Float) from Float to Float{
         return ms / 1000.0 ;
     }
 
+    public inline function asMilliseconds(): Int {
+        return Math.round(this * 1000.0);
+    }
+    
     public inline function asSeconds(): Float {
         return this ;
     }
