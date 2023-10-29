@@ -34,10 +34,13 @@ class TestGamelift implements Asyncable {
 			trace("onUpdateGameSession");
 		};
         var _ended = false;
+        var _endTime = null;
+
 		processParameters.onProcessTerminate = function(time:Date) {
 			trace('onTerminateProcess before ${time}');
             GameLiftServerAPI.processEnding();
             _ended = true;
+            _endTime = time;
 		};
 		processParameters.onHealthCheck = function() {
 			trace("onHealthCheck");
@@ -50,12 +53,17 @@ class TestGamelift implements Asyncable {
 		GameLiftServerAPI.processReady(processParameters);
 		trace("hi from the other side!");
 
-        while (!_ended) {
+        while (_endTime == null || _endTime.getTime() > Date.now().getTime()) {
+            if (_endTime != null) {
+                Sys.println('Shutting down in ${_endTime.getTime() - Date.now().getTime()} ms');
+            }
+            GameLiftServerAPI.tick(100);
             @await delay(100);
         }
 
-        GameLiftServerAPI.destroy();
-
+        trace('Destroying');
+        @await GameLiftServerAPI.destroy();
+        trace('Destroyed');
 		null;
 	}
 
@@ -93,6 +101,10 @@ class TestGamelift implements Asyncable {
 	public static function main() {
         resetLog();
 		haxe.Log.trace = customTrace;
-		execute();
+        try {
+            execute();
+        } catch (e:Dynamic) {
+            Sys.println("Error: " + e);
+        }
 	}
 }

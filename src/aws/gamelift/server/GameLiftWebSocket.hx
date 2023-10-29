@@ -114,7 +114,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 				Error:String,
 				Description:String
 			} = haxe.Json.parse(messageStr);
-			trace('Json: ${json}');
+//			trace('Json: ${json}');
 			if (json != null) {
 				if (!isNullOrEmpty(json.Error)) {
 					_serverError = json.Description;

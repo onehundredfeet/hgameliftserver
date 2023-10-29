@@ -15,7 +15,15 @@ import aws.gamelift.server.model.Messages;
 #if js
 import js.lib.Promise;
 #end
+
+
+
 class ServerState implements IWebSocketMessageHandler implements Asyncable {
+	@async static inline function await<T>(val:js.lib.Promise<T>):T {
+		return js.Syntax.code("await {0}", val);
+	 }
+
+	 
 	// When within 15 minutes of expiration we retrieve new instance role credentials
 	public static final InstanceRoleCredentialTtlMin:TimeSpan = TimeSpan.fromMinutes(15);
 
@@ -26,7 +34,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 	private static final EnvironmentVariableAuthToken = "GAMELIFT_SDK_AUTH_TOKEN";
 
 	private static final RoleSessionNameMaxLength = 64;
-	private static final HealthcheckIntervalSeconds = 60.0;
+	private static final HealthcheckIntervalSeconds = 1.0;
 	private static final HealthcheckMaxJitterSeconds = 10.0;
 	private static final HealthcheckTimeoutSeconds:Int = Math.round(HealthcheckIntervalSeconds - HealthcheckMaxJitterSeconds);
 	private static final SdkLanguage = "CSharp";
@@ -126,7 +134,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return gameLiftWebSocket.sendMessage(RemovePlayerSessionRequest.make(gameSessionId, playerSessionId));
 	}
 
-	public function describePlayerSessions(request:DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
+	@async public function describePlayerSessions(request:DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
 		if (request == null) {
 			return new DescribePlayerSessionsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "DescribePlayerSessionsRequest is required"));
 		}
@@ -137,7 +145,8 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 				"At least one of PlayerSessionId, GameSessionId and PlayerId is required."));
 		}
 
-		var outcome = webSocketRequestHandler.SendRequest(request);
+		var outcome = await(webSocketRequestHandler.sendRequest(request));
+
 		if (!outcome.success) {
 			return new DescribePlayerSessionsOutcome(outcome.error);
 		}
@@ -145,7 +154,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return cast(outcome, DescribePlayerSessionsOutcome);
 	}
 
-	public function startMatchBackfill(request:StartMatchBackfillRequest):StartMatchBackfillOutcome {
+	@async public function startMatchBackfill(request:StartMatchBackfillRequest):StartMatchBackfillOutcome {
 		if (request == null) {
 			return new StartMatchBackfillOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StartMatchBackfillRequest is required"));
 		}
@@ -165,7 +174,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 				"At least 1 Player is required in StartMatchBackfillRequest"));
 		}
 
-		var outcome = webSocketRequestHandler.SendRequest(request);
+		var outcome = await(webSocketRequestHandler.sendRequest(request));
 		if (!outcome.success) {
 			return new StartMatchBackfillOutcome(outcome.error);
 		}
@@ -173,7 +182,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return cast(outcome, StartMatchBackfillOutcome);
 	}
 
-	public function stopMatchBackfill(request:StopMatchBackfillRequest):GenericOutcome {
+	@async public function stopMatchBackfill(request:StopMatchBackfillRequest):GenericOutcome {
 		if (request == null) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StopMatchBackfillRequest is required"));
 		}
@@ -191,7 +200,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "TicketId is required in StopMatchBackfillRequest"));
 		}
 
-		return webSocketRequestHandler.SendRequest(request);
+		return await(webSocketRequestHandler.sendRequest(request));
 	}
 
 	private static function getNextHealthCheckIntervalSeconds():Float {
@@ -200,12 +209,12 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return HealthcheckIntervalSeconds + jitter;
 	}
 
-	private function heartbeatServerProcess():Void // async
+	@async private function heartbeatServerProcess():GenericOutcome // async
 	{
 		// duplicate ProcessReady check here right before invoking
 		if (!processIsReady) {
 			Log.debug("Reporting Health on an inactive process. Ignoring.");
-			return;
+			return new GenericOutcome();
 		}
 
 		Log.debug("Reporting health using the OnHealthCheck callback.");
@@ -219,10 +228,18 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		}
 
 		var request =  HeartbeatServerProcessRequest.make(healthCheckResult);
-		var outcome = webSocketRequestHandler.SendRequest(request);
-		if (!outcome.success) {
-			Log.warning('Failed to report health status to GameLift service. Error: ${outcome.error}');
+		var outcome : GenericOutcome = await(webSocketRequestHandler.sendRequest(request));
+		trace('Outcome: ${outcome} : ${js.node.util.Inspect.inspect(outcome)}');
+		if (outcome != null && !outcome.success) {
+			if (outcome != null)  {
+				Log.warning('Failed to report health status to GameLift service. Error: ${outcome.error}');
+			}
+			else {
+				Log.warning('Failed to report health status to GameLift service.');
+			}
 		}
+
+		return outcome;
 	}
 
 	@async public function initializeNetworking(serverParameters:ServerParameters):GenericOutcome {
@@ -255,11 +272,11 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return @await gameLiftWebSocket.connect(webSocketUrl, processId, hostId, fleetId, authToken);
 	}
 
-	public function GetComputeCertificate():GetComputeCertificateOutcome {
+	@async public function getComputeCertificate():GetComputeCertificateOutcome {
 		Log.debug("Calling GetComputeCertificate");
 
 		var webSocketRequest = new GetComputeCertificateRequest();
-		var outcome = webSocketRequestHandler.SendRequest(webSocketRequest);
+		var outcome = await(webSocketRequestHandler.sendRequest(webSocketRequest));
 		if (!outcome.success) {
 			return new GetComputeCertificateOutcome(outcome.error);
 		}
@@ -267,7 +284,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		return cast(outcome, GetComputeCertificateOutcome);
 	}
 
-	public function GetFleetRoleCredentials(request:GetFleetRoleCredentialsRequest):GetFleetRoleCredentialsOutcome {
+	@async public function getFleetRoleCredentials(request:GetFleetRoleCredentialsRequest):GetFleetRoleCredentialsOutcome {
 		Log.debug('Calling GetFleetRoleCredentials: ${request}');
 
 		// If we've decided we're not on managed EC2, fail without making an APIGW call
@@ -302,7 +319,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 			return new GetFleetRoleCredentialsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION));
 		}
 
-		var rawOutcome = webSocketRequestHandler.SendRequest(request);
+		var rawOutcome = await(webSocketRequestHandler.sendRequest(request));
 		if (!rawOutcome.success) {
 			return new GetFleetRoleCredentialsOutcome(rawOutcome.error);
 		}
@@ -356,9 +373,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 			return;
 		}
 
-		Task.run(() -> {
-			processParameters.onUpdateGameSession(new UpdateGameSession(gameSession, updateReason, backfillTicketId));
-		});
+		processParameters.onUpdateGameSession(new UpdateGameSession(gameSession, updateReason, backfillTicketId));
 	}
 
 	public function onTerminateProcess(terminationTime:Float) {
@@ -409,20 +424,20 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
     }
     #end
     
-	public function shutdown() {
+	@async public function shutdown() {
 		processIsReady = false;
 
 		// Sleep thread for 1 sec.
 		// This is to help deal with race conditions related to processReady flag being turned off (i.e. HeartbeatServerProcess)
         #if js
-        delay(2000).then(function(_) {
-            trace("2 seconds later");
-        });
+        @await delay(2000);
         #else
 		Sys.sleep(TimeSpan.fromSeconds(1).asMilliseconds());
         #end
 
 		gameLiftWebSocket.disconnect();
+
+		webSocketRequestHandler.clear();
 	}
 
 	var _lastHealthCheck = 0;

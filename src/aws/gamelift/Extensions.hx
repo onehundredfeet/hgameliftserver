@@ -10,7 +10,7 @@ class Extensions {
     }
 
     public static function tryRemove<V,K>(map:IMap<K,V>, key:K):Null<V> {
-        if (map.exists(key)) {
+        if (!map.exists(key)) {
             return null;
         }
         var value = map.get(key);

@@ -22,6 +22,7 @@ enum ConnectionState {
 class TestConnection {
 	var _ws:js.node.WebSocket;
 	var _state = ConnectionState.Disconnected;
+    var _hbCount = 0;
 
 	function makeSuccessResponse(msg) {
 		var response = new ResponseMessage();
@@ -75,9 +76,18 @@ class TestConnection {
                     {
                         _state = ConnectionState.Activated;
                         sendMsg(makeSuccessResponse(msg));
-                        _state = ConnectionState.Terminating;
-                        final AutoTerminateTimerMS = 5000;
-                        sendMsg(TerminateProcessMessage.make(Date.now().getTime() + AutoTerminateTimerMS));
+                    }
+                    case [Activated, MessageActions.HeartbeatServerProcess]:
+                    {
+                        trace('Received heartbeat');
+                        _hbCount++;
+                        if (_hbCount == 5) {
+                            _state = ConnectionState.Terminating;
+                            final AutoTerminateTimerMS = 5000;
+                            sendMsg(TerminateProcessMessage.make(Date.now().getTime() + AutoTerminateTimerMS));    
+                        } else {
+                            sendMsg(makeSuccessResponse(msg));
+                        }
                     }
                     case [Terminating, MessageActions.TerminateServerProcess]:
                     {

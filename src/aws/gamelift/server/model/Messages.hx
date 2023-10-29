@@ -11,6 +11,7 @@ class MessageActions {
 	// Cloud Server to Game Server
 	public static final ActivateGameSession = "ActivateGameSession";
 	public static final TerminateServerProcess = "TerminateServerProcess";
+	public static final HeartbeatServerProcess = "HeartbeatServerProcess";
 
 	// bidirectional
 	public static final AcceptPlayerSession = "AcceptPlayerSession";
@@ -19,7 +20,6 @@ class MessageActions {
 	public static final StartMatchBackfill = "StartMatchBackfill";
 	public static final DescribePlayerSessions = "DescribePlayerSessions";
 	public static final StopMatchBackfill = "StopMatchBackfill";
-	public static final HeartbeatServerProcess = "HeartbeatServerProcess";
 	public static final GetComputeCertificate = "GetComputeCertificate";
 	public static final GetFleetRoleCredentials = "GetFleetRoleCredentials";
 	public static final RefreshConnection = "RefreshConnection";

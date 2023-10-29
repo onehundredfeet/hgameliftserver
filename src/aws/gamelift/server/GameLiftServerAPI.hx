@@ -399,7 +399,7 @@ class GameLiftServerAPI implements Asyncable {
 	/// </example>
 
 	public static function getComputeCertificate():GetComputeCertificateOutcome {
-		return ServerState.instance.GetComputeCertificate();
+		return ServerState.instance.getComputeCertificate();
 	}
 
 	/// <summary>
@@ -435,7 +435,7 @@ class GameLiftServerAPI implements Asyncable {
 	/// </example>
 
 	public static function getFleetRoleCredentials( request : GetFleetRoleCredentialsRequest):GetFleetRoleCredentialsOutcome {
-		return ServerState.instance.GetFleetRoleCredentials(request);
+		return ServerState.instance.getFleetRoleCredentials(request);
 	}
 
 	/// <summary>
@@ -458,8 +458,8 @@ class GameLiftServerAPI implements Asyncable {
 	/// </code>
 	/// </example>
 
-	public static function destroy():GenericOutcome {
-		ServerState.instance.shutdown();
+	@async public static function destroy():GenericOutcome {
+		@await ServerState.instance.shutdown();
 		return new GenericOutcome();
 	}
 
