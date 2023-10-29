@@ -1,5 +1,6 @@
 package;
 
+import aws.gamelift.server.model.GameSession;
 import aws.gamelift.server.model.Messages.MessageActions;
 import haxe.Json;
 import hxasync.Asyncable;
@@ -81,7 +82,23 @@ class TestConnection {
                     {
                         trace('Received heartbeat');
                         _hbCount++;
-                        if (_hbCount == 5) {
+                        if (_hbCount == 2) {
+                            trace('Sending game session udpate');
+                            var gameSession = new GameSession();
+                            gameSession.DnsName = "TestDNS";
+                            gameSession.GameSessionId = "TestGameSessionId";
+                            gameSession.IpAddress = "jingle.bells";
+                            gameSession.MatchmakerData = "{}";
+                            gameSession.MaximumPlayerSessionCount = 10;
+                            gameSession.Name = "TestGameSession";
+                            gameSession.Port = 1339;
+                            gameSession.GameSessionData = "{}";
+                            gameSession.MatchmakerData = "{}";
+                            gameSession.GameProperties = new Map<String, String>();
+                            var msg = UpdateGameSessionMessage.make(gameSession, "Cause I said so", "" );
+                            sendMsg(msg);
+                        }
+                        else if (_hbCount == 10) {
                             _state = ConnectionState.Terminating;
                             final AutoTerminateTimerMS = 5000;
                             sendMsg(TerminateProcessMessage.make(Date.now().getTime() + AutoTerminateTimerMS));    

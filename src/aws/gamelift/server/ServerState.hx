@@ -79,6 +79,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 	}
 
 	public function processEnding():GenericOutcome {
+		trace('Process ending');
 		processIsReady = false;
 
 		var result = gameLiftWebSocket.sendMessage(TerminateServerProcessRequest.make());
@@ -229,7 +230,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 
 		var request =  HeartbeatServerProcessRequest.make(healthCheckResult);
 		var outcome : GenericOutcome = await(webSocketRequestHandler.sendRequest(request));
-		trace('Outcome: ${outcome} : ${js.node.util.Inspect.inspect(outcome)}');
+//		trace('Outcome: ${outcome} : ${js.node.util.Inspect.inspect(outcome)}');
 		if (outcome != null && !outcome.success) {
 			if (outcome != null)  {
 				Log.warning('Failed to report health status to GameLift service. Error: ${outcome.error}');
@@ -373,7 +374,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 			return;
 		}
 
-		processParameters.onUpdateGameSession(new UpdateGameSession(gameSession, updateReason, backfillTicketId));
+		processParameters.onUpdateGameSession(gameSession, updateReason, backfillTicketId);
 	}
 
 	public function onTerminateProcess(terminationTime:Float) {
@@ -425,6 +426,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
     #end
     
 	@async public function shutdown() {
+		trace('Shutting down...');
 		processIsReady = false;
 
 		// Sleep thread for 1 sec.
@@ -440,14 +442,16 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 		webSocketRequestHandler.clear();
 	}
 
-	var _lastHealthCheck = 0;
+	var _lastHealthCheck = 0.0;
 
 	public function tick(dt:Float):Void {
 		if (processIsReady) {
-			if (Date.now().getSeconds() - _lastHealthCheck > HealthcheckIntervalSeconds) {
-				_lastHealthCheck = Date.now().getSeconds();
+			if (((Date.now().getTime() - _lastHealthCheck) / 1000) > HealthcheckIntervalSeconds) {
+				_lastHealthCheck = Date.now().getTime();
 				heartbeatServerProcess();
 			}
+		} else {
+			trace("processIsReady is false");
 		}
 	}
 }

@@ -30,7 +30,7 @@ class TestGamelift implements Asyncable {
 			trace("onStartGameSession");
 			GameLiftServerAPI.activateGameSession();
 		};
-		processParameters.onUpdateGameSession = function(update:UpdateGameSession) {
+		processParameters.onUpdateGameSession = function(update:GameSession, reason:UpdateReason, backfillTicketId: String) {
 			trace("onUpdateGameSession");
 		};
         var _ended = false;
@@ -38,9 +38,9 @@ class TestGamelift implements Asyncable {
 
 		processParameters.onProcessTerminate = function(time:Date) {
 			trace('onTerminateProcess before ${time}');
-            GameLiftServerAPI.processEnding();
             _ended = true;
             _endTime = time;
+            GameLiftServerAPI.processEnding();
 		};
 		processParameters.onHealthCheck = function() {
 			trace("onHealthCheck");
@@ -57,7 +57,8 @@ class TestGamelift implements Asyncable {
             if (_endTime != null) {
                 Sys.println('Shutting down in ${_endTime.getTime() - Date.now().getTime()} ms');
             }
-            GameLiftServerAPI.tick(100);
+            trace('Ticking ${_endTime} - ${ Date.now()}');
+            GameLiftServerAPI.tick(.100);
             @await delay(100);
         }
 

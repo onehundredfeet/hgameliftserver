@@ -134,7 +134,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 				Log.error('could not parse message. Data: ${messageStr}');
 				return;
 			}
-			Log.info('Received Action ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
+			Log.info('Received Action ${message.Action} for GameLift with status ${message.StatusCode}.');
 			// It's safe to cast enums to ints in C#. Each HttpStatusCode enum is associated with its numerical
 			// status code. RequestId will be null when we get a message not associated with a request.
 			if (message.StatusCode != HttpStatusCode.OK && message.RequestId != null) {

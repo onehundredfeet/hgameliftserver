@@ -1,10 +1,10 @@
 package aws.gamelift.server;
 
 import aws.gamelift.server.model.GameSession;
-import aws.gamelift.server.model.UpdateGameSession;
+import aws.gamelift.server.model.UpdateReason;
 
 typedef OnStartGameSessionDelegate = (gameSession:GameSession) -> Void;
-typedef OnUpdateGameSessionDelegate = (updateGameSession:UpdateGameSession) -> Void;
+typedef OnUpdateGameSessionDelegate = (gameSession:GameSession, updateReason:UpdateReason, backfillTicketId:String) -> Void;
 typedef OnProcessTerminateDelegate = (time : Date) -> Void;
 typedef OnHealthCheckDelegate = () -> Bool;
 
@@ -63,7 +63,7 @@ class ProcessParameters {
 			onProcessTerminate:OnProcessTerminateDelegate = null, onHealthCheck:OnHealthCheckDelegate = null, port:Int = -1,
 			logParameters:LogParameters = null) {
 		this.onStartGameSession = onStartGameSession != null ? onStartGameSession : (_) -> {};
-		this.onUpdateGameSession = onUpdateGameSession != null ? onUpdateGameSession : (_) -> {};
+		this.onUpdateGameSession = onUpdateGameSession != null ? onUpdateGameSession : (_, _, _ ) -> {};
 		this.onProcessTerminate = onProcessTerminate != null ? onProcessTerminate : (_) -> {};
 		this.onHealthCheck = onHealthCheck != null ? onHealthCheck : () -> return true;
 		this.port = port;

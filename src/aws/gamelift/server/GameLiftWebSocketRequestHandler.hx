@@ -116,7 +116,7 @@ class GameLiftWebSocketRequestHandler implements Asyncable {
 		}
 
 		
-		trace ('Sending request "${request.RequestId}" : ${requestIdToPromise.get(request.RequestId)})}');
+		trace ('Sending request "${request.RequestId}"');
 		gameLiftWebSocket.sendMessage(request);
 
 		return promiseC;
