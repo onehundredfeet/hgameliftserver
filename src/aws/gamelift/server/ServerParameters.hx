@@ -6,13 +6,9 @@ package aws.gamelift.server;
 /// </summary>
 class ServerParameters {
 	public var webSocketUrl:String;
-
 	public var processId:String;
-
 	public var hostId:String;
-
 	public var fleetId:String;
-
 	public var authToken:String;
 
 	public function new(webSocketUrl:String, processId:String, hostId:String, fleetId:String, authToken:String) {

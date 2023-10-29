@@ -1,0 +1,5 @@
+common.hxml
+
+--main TestWebSocketServer
+--js bin/testwsserver.js
+

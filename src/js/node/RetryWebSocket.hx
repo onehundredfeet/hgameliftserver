@@ -126,7 +126,7 @@ class RetryWebSocket implements Asyncable{
         }
     }
     function _onMessageFn(event):Void {
-        trace('event: ${Inspect.inspect(event)}');
+//        trace('event: ${Inspect.inspect(event)}');
 
 		/*
 		trace('messageRaw: ${messageRaw} type : ${Type.typeof(messageRaw)} data : ${data} str : ${messageStr}');

@@ -1,0 +1,5 @@
+common.hxml
+
+--main TestGamelift
+--js bin/testgl.js
+

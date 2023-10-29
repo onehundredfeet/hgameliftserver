@@ -3,15 +3,20 @@ package aws.gamelift.server.model;
 import uuid.Uuid;
 
 class MessageActions {
-	public static final AcceptPlayerSession = "AcceptPlayerSession";
+	// Game Server to Cloud server
+	public static final ActivateServerProcess = "ActivateServerProcess";
+	public static final CreateGameSession = "CreateGameSession";
+	public static final TerminateProcess = "TerminateProcess";
+
+	// Cloud Server to Game Server
 	public static final ActivateGameSession = "ActivateGameSession";
 	public static final TerminateServerProcess = "TerminateServerProcess";
-	public static final ActivateServerProcess = "ActivateServerProcess";
+
+	// bidirectional
+	public static final AcceptPlayerSession = "AcceptPlayerSession";
 	public static final UpdatePlayerSessionCreationPolicy = "UpdatePlayerSessionCreationPolicy";
-	public static final CreateGameSession = "CreateGameSession";
 	public static final UpdateGameSession = "UpdateGameSession";
 	public static final StartMatchBackfill = "StartMatchBackfill";
-	public static final TerminateProcess = "TerminateProcess";
 	public static final DescribePlayerSessions = "DescribePlayerSessions";
 	public static final StopMatchBackfill = "StopMatchBackfill";
 	public static final HeartbeatServerProcess = "HeartbeatServerProcess";
@@ -26,9 +31,15 @@ class Message {
 	public var Action:String;
 	public var RequestId:String;
 
-	public function new(action:String = null) {
+	public function new() {}
+
+	inline function setClientMessage(action:String) {
 		this.Action = action;
-		this.RequestId = Uuid.v4(); // Guid.NewGuid().ToString();
+		this.RequestId = Uuid.v4(); // Guid.NewGuid().ToString();;;
+	}
+	inline function setServerMessage(action:String)
+	{
+		this.Action = action;
 	}
 }
 
@@ -38,26 +49,38 @@ class ResponseMessage extends Message {
 	public var StatusCode:Int;
 	public var ErrorMessage:String;
 
-	public function new() {
-		super();
-		this.RequestId = null;
+	public static function make(statusCode:Int, errorMessage:String, requestId:String) {
+		var _this = new ResponseMessage();
+		_this.StatusCode = statusCode;
+		_this.ErrorMessage = errorMessage;
+		_this.RequestId = requestId;
+		return _this;
 	}
 }
 
+// Server Messages
 class UpdateGameSessionMessage extends Message {
 	public var GameSession:GameSession;
 	public var UpdateReason:String;
 	public var BackfillTicketId:String;
 
-	public function new(gameSession:GameSession, updateReason:String, backfillTicketId:String) {
-		super();
-		GameSession = gameSession;
-		UpdateReason = updateReason;
-		BackfillTicketId = backfillTicketId;
+	public static function make(gameSession:GameSession, updateReason:String, backfillTicketId:String) {
+		var _this = new UpdateGameSessionMessage();
+		_this.setServerMessage(MessageActions.UpdateGameSession);
+		_this.GameSession = gameSession;
+		_this.UpdateReason = updateReason;
+		_this.BackfillTicketId = backfillTicketId;
+		return _this;
 	}
 }
 
 class CreateGameSessionMessage extends Message {
+	public static function make() {
+		var _this = new CreateGameSessionMessage();
+		_this.setServerMessage(MessageActions.CreateGameSession);
+		return _this;
+	}
+
 	public var GameSessionId:String;
 	public var GameSessionName:String;
 	public var MaximumPlayerSessionCount:Int;
@@ -69,23 +92,52 @@ class CreateGameSessionMessage extends Message {
 	public var DnsName:String;
 }
 
+class RefreshConnectionMessage extends Message {
+	public var RefreshConnectionEndpoint:String;
+	public var AuthToken:String;
+
+	public static function make(refreshConnectionEndpoint:String, authToken:String) {
+		var _this = new RefreshConnectionMessage();
+		_this.setServerMessage(MessageActions.RefreshConnection);
+		_this.RefreshConnectionEndpoint = refreshConnectionEndpoint;
+		_this.AuthToken = authToken;
+		return _this;
+	}
+}
+
+class TerminateProcessMessage extends Message {
+	public var TerminationTime:Float;
+
+	public static function make(terminationTime:Float) {
+		var _this = new TerminateProcessMessage();
+		_this.setServerMessage(MessageActions.TerminateProcess);
+		_this.TerminationTime = terminationTime;
+		return _this;
+	}
+}
+
+// Game Server -> Cloud Server
 class AcceptPlayerSessionRequest extends Message {
 	public var GameSessionId:String;
 	public var PlayerSessionId:String;
 
-	public function new(gameSessionId:String, playerSessionId:String) {
-		super(MessageActions.AcceptPlayerSession);
-		this.GameSessionId = gameSessionId;
-		this.PlayerSessionId = playerSessionId;
+	public static function make(gameSessionId:String, playerSessionId:String) {
+		var _this = new AcceptPlayerSessionRequest();
+		_this.setClientMessage(MessageActions.AcceptPlayerSession);
+		_this.GameSessionId = gameSessionId;
+		_this.PlayerSessionId = playerSessionId;
+		return _this;
 	}
 }
 
 class ActivateGameSessionRequest extends Message {
 	public var gameSessionId:String;
 
-	public function new(gameSessionId:String) {
-		super(MessageActions.ActivateGameSession);
-		this.gameSessionId = gameSessionId;
+	public static function make(gameSessionId:String) {
+		var _this = new ActivateGameSessionRequest();
+		_this.setClientMessage(MessageActions.ActivateGameSession);
+		_this.gameSessionId = gameSessionId;
+		return _this;
 	}
 }
 
@@ -97,8 +149,10 @@ class DescribePlayerSessionsRequest extends Message {
 	public var NextToken:String;
 	public var Limit = 50;
 
-	public function new() {
-		super(MessageActions.DescribePlayerSessions);
+	public static function make() {
+		var _this = new DescribePlayerSessionsRequest();
+		_this.setClientMessage(MessageActions.DescribePlayerSessions);
+		return _this;
 	}
 }
 
@@ -108,18 +162,22 @@ class ActivateServerProcessRequest extends Message {
 	public var Port:Int;
 	public var LogPaths:Array<String>;
 
-	public function new(sdkVersion:String, sdkLanguage:String, port:Int, logPaths:Array<String>) {
-		super(MessageActions.ActivateServerProcess);
-		this.SdkVersion = sdkVersion;
-		this.SdkLanguage = sdkLanguage;
-		this.Port = port;
-		this.LogPaths = logPaths;
+	public static function make(sdkVersion:String, sdkLanguage:String, port:Int, logPaths:Array<String>) {
+		var _this = new ActivateServerProcessRequest();
+		_this.setClientMessage(MessageActions.ActivateServerProcess);
+		_this.SdkVersion = sdkVersion;
+		_this.SdkLanguage = sdkLanguage;
+		_this.Port = port;
+		_this.LogPaths = logPaths;
+		return _this;
 	}
 }
 
 class GetComputeCertificateRequest extends Message {
-	public function new() {
-		super(MessageActions.GetComputeCertificate);
+	public static function make() {
+		var _this = new GetComputeCertificateRequest();
+		_this.setClientMessage(MessageActions.GetComputeCertificate);
+		return _this;
 	}
 }
 
@@ -128,18 +186,22 @@ class GetFleetRoleCredentialsRequest extends Message {
 
 	public var RoleSessionName:String;
 
-	public function new(roleArn:String) {
-		super(MessageActions.GetFleetRoleCredentials);
-		this.RoleArn = roleArn;
+	public static function make(roleArn:String) {
+		var _this = new GetFleetRoleCredentialsRequest();
+		_this.setClientMessage(MessageActions.GetFleetRoleCredentials);
+		_this.RoleArn = roleArn;
+		return _this;
 	}
 }
 
 class HeartbeatServerProcessRequest extends Message {
 	public var HealthStatus:Bool;
 
-	public function new(healthStatus:Bool) {
-		super(MessageActions.HeartbeatServerProcess);
-		this.HealthStatus = healthStatus;
+	public static function make(healthStatus:Bool) {
+		var _this = new HeartbeatServerProcessRequest();
+		_this.setClientMessage(MessageActions.HeartbeatServerProcess);
+		_this.HealthStatus = healthStatus;
+		return _this;
 	}
 }
 
@@ -148,11 +210,13 @@ class StopMatchBackfillRequest extends Message {
 	public var MatchmakingConfigurationArn:String;
 	public var TicketId:String;
 
-	public function new(gameSessionArn:String, matchmakingConfigurationArn:String, ticketId:String) {
-		super(MessageActions.StopMatchBackfill);
-		this.GameSessionArn = gameSessionArn;
-		this.MatchmakingConfigurationArn = matchmakingConfigurationArn;
-		this.TicketId = ticketId;
+	public static function make(gameSessionArn:String, matchmakingConfigurationArn:String, ticketId:String) {
+		var _this = new StopMatchBackfillRequest();
+		_this.setClientMessage(MessageActions.StopMatchBackfill);
+		_this.GameSessionArn = gameSessionArn;
+		_this.MatchmakingConfigurationArn = matchmakingConfigurationArn;
+		_this.TicketId = ticketId;
+		return _this;
 	}
 }
 
@@ -162,28 +226,25 @@ class StartMatchBackfillRequest extends Message {
 	public var Players:Array<Player>;
 	public var TicketId:String;
 
-	public function new(gameSessionArn:String, matchmakingConfigurationArn:String, players:Array<Player>) {
-		super(MessageActions.StartMatchBackfill);
-		this.GameSessionArn = gameSessionArn;
-		this.MatchmakingConfigurationArn = matchmakingConfigurationArn;
-		this.Players = players;
+	public static function make(gameSessionArn:String, matchmakingConfigurationArn:String, players:Array<Player>) {
+		var _this = new StartMatchBackfillRequest();
+		_this.setClientMessage(MessageActions.StartMatchBackfill);
+		_this.GameSessionArn = gameSessionArn;
+		_this.MatchmakingConfigurationArn = matchmakingConfigurationArn;
+		_this.Players = players;
+		return _this;
 	}
 }
 
 class TerminateServerProcessRequest extends Message {
-	public function new() {
-		super(MessageActions.TerminateServerProcess);
+	public static function make() {
+		var _this = new TerminateServerProcessRequest();
+		_this.setClientMessage(MessageActions.TerminateServerProcess);
+		return _this;
 	}
 }
 
-class TerminateProcessMessage extends Message {
-	public var TerminationTime:Float;
 
-	public function new(terminationTime:Float) {
-		super(MessageActions.TerminateProcess);
-		TerminationTime = terminationTime;
-	}
-}
 
 class StartMatchBackfillResponse extends Message {
 	public var TicketId:String;
@@ -215,25 +276,18 @@ class GetFleetRoleCredentialsResponse extends Message {
 	public var Expiration:Float;
 }
 
-class RefreshConnectionMessage extends Message {
-	public var RefreshConnectionEndpoint:String;
-	public var AuthToken:String;
 
-	public function new(refreshConnectionEndpoint:String, authToken:String) {
-		super(MessageActions.RefreshConnection);
-		RefreshConnectionEndpoint = refreshConnectionEndpoint;
-		AuthToken = authToken;
-	}
-}
 
 class RemovePlayerSessionRequest extends Message {
 	public var gameSessionId:String;
 	public var playerSessionId:String;
 
-	public function new(gameSessionId:String, playerSessionId:String) {
-		super(MessageActions.RemovePlayerSession);
-		this.gameSessionId = gameSessionId;
-		this.playerSessionId = playerSessionId;
+	public static function make(gameSessionId:String, playerSessionId:String) {
+		var _this = new RemovePlayerSessionRequest();
+		_this.setServerMessage(MessageActions.RemovePlayerSession);
+		_this.gameSessionId = gameSessionId;
+		_this.playerSessionId = playerSessionId;
+		return _this;
 	}
 }
 
@@ -241,9 +295,11 @@ class UpdatePlayerSessionCreationPolicyRequest extends Message {
 	public var gameSessionId:String;
 	public var playerSessionPolicy:String;
 
-	public function new(gameSessionId:String, policy:PlayerSessionCreationPolicy) {
-		super(MessageActions.UpdatePlayerSessionCreationPolicy);
-		this.gameSessionId = gameSessionId;
-		this.playerSessionPolicy = policy;
+	public static function make(gameSessionId:String, policy:PlayerSessionCreationPolicy) {
+		var _this = new UpdatePlayerSessionCreationPolicyRequest();
+		_this.setClientMessage(MessageActions.UpdatePlayerSessionCreationPolicy);
+		_this.gameSessionId = gameSessionId;
+		_this.playerSessionPolicy = policy;
+		return _this;
 	}
 }

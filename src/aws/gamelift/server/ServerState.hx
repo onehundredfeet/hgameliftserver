@@ -1,5 +1,6 @@
 package aws.gamelift.server;
 
+import hxasync.Asyncable;
 import haxe.Exception;
 import seedyrng.*;
 import aws.gamelift.server.model.*;
@@ -14,7 +15,7 @@ import aws.gamelift.server.model.Messages;
 #if js
 import js.lib.Promise;
 #end
-class ServerState implements IWebSocketMessageHandler {
+class ServerState implements IWebSocketMessageHandler implements Asyncable {
 	// When within 15 minutes of expiration we retrieve new instance role credentials
 	public static final InstanceRoleCredentialTtlMin:TimeSpan = TimeSpan.fromMinutes(15);
 
@@ -63,29 +64,29 @@ class ServerState implements IWebSocketMessageHandler {
 		processIsReady = true;
 		processParameters = procParameters;
 
-		var result = gameLiftWebSocket.sendMessage(new ActivateServerProcessRequest(GameLiftServerAPI.GetSdkVersion().result, SdkLanguage,
+		var result = gameLiftWebSocket.sendMessage( ActivateServerProcessRequest.make(GameLiftServerAPI.GetSdkVersion().result, SdkLanguage,
 			processParameters.port, processParameters.logParameters.LogPaths));
 
 		return result;
 	}
 
-	public function ProcessEnding():GenericOutcome {
+	public function processEnding():GenericOutcome {
 		processIsReady = false;
 
-		var result = gameLiftWebSocket.sendMessage(new TerminateServerProcessRequest());
+		var result = gameLiftWebSocket.sendMessage(TerminateServerProcessRequest.make());
 
 		return result;
 	}
 
-	public function ActivateGameSession():GenericOutcome {
+	public function activateGameSession():GenericOutcome {
 		if (isNullOrEmpty(gameSessionId)) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
 		}
 
-		return gameLiftWebSocket.sendMessage(new ActivateGameSessionRequest(gameSessionId));
+		return gameLiftWebSocket.sendMessage( ActivateGameSessionRequest.make(gameSessionId));
 	}
 
-	public function GetGameSessionId():AwsStringOutcome {
+	public function getGameSessionId():AwsStringOutcome {
 		if (isNullOrEmpty(gameSessionId)) {
 			return new AwsStringOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
 		}
@@ -93,7 +94,7 @@ class ServerState implements IWebSocketMessageHandler {
 		return new AwsStringOutcome(null, gameSessionId);
 	}
 
-	public function GetTerminationTime():AwsDateTimeOutcome {
+	public function getTerminationTime():AwsDateTimeOutcome {
 		if (terminationTime.getTime() == Date.fromTime(0.0).getTime()) {
 			return new AwsDateTimeOutcome(new GameLiftError(GameLiftErrorType.TERMINATION_TIME_NOT_SET));
 		}
@@ -101,31 +102,31 @@ class ServerState implements IWebSocketMessageHandler {
 		return new AwsDateTimeOutcome(null, terminationTime);
 	}
 
-	public function UpdatePlayerSessionCreationPolicy(playerSessionPolicy:PlayerSessionCreationPolicy):GenericOutcome {
+	public function updatePlayerSessionCreationPolicy(playerSessionPolicy:PlayerSessionCreationPolicy):GenericOutcome {
 		if (isNullOrEmpty(gameSessionId)) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
 		}
 
-		return gameLiftWebSocket.sendMessage(new UpdatePlayerSessionCreationPolicyRequest(gameSessionId, playerSessionPolicy));
+		return gameLiftWebSocket.sendMessage( UpdatePlayerSessionCreationPolicyRequest.make(gameSessionId, playerSessionPolicy));
 	}
 
-	public function AcceptPlayerSession(playerSessionId:String):GenericOutcome {
+	public function acceptPlayerSession(playerSessionId:String):GenericOutcome {
 		if (isNullOrEmpty(gameSessionId)) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
 		}
 
-		return gameLiftWebSocket.sendMessage(new AcceptPlayerSessionRequest(gameSessionId, playerSessionId));
+		return gameLiftWebSocket.sendMessage( AcceptPlayerSessionRequest.make(gameSessionId, playerSessionId));
 	}
 
-	public function RemovePlayerSession(playerSessionId:String):GenericOutcome {
+	public function removePlayerSession(playerSessionId:String):GenericOutcome {
 		if (isNullOrEmpty(gameSessionId)) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.GAMESESSION_ID_NOT_SET));
 		}
 
-		return gameLiftWebSocket.sendMessage(new RemovePlayerSessionRequest(gameSessionId, playerSessionId));
+		return gameLiftWebSocket.sendMessage(RemovePlayerSessionRequest.make(gameSessionId, playerSessionId));
 	}
 
-	public function DescribePlayerSessions(request:DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
+	public function describePlayerSessions(request:DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
 		if (request == null) {
 			return new DescribePlayerSessionsOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "DescribePlayerSessionsRequest is required"));
 		}
@@ -144,7 +145,7 @@ class ServerState implements IWebSocketMessageHandler {
 		return cast(outcome, DescribePlayerSessionsOutcome);
 	}
 
-	public function StartMatchBackfill(request:StartMatchBackfillRequest):StartMatchBackfillOutcome {
+	public function startMatchBackfill(request:StartMatchBackfillRequest):StartMatchBackfillOutcome {
 		if (request == null) {
 			return new StartMatchBackfillOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StartMatchBackfillRequest is required"));
 		}
@@ -172,7 +173,7 @@ class ServerState implements IWebSocketMessageHandler {
 		return cast(outcome, StartMatchBackfillOutcome);
 	}
 
-	public function StopMatchBackfill(request:StopMatchBackfillRequest):GenericOutcome {
+	public function stopMatchBackfill(request:StopMatchBackfillRequest):GenericOutcome {
 		if (request == null) {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "StopMatchBackfillRequest is required"));
 		}
@@ -193,13 +194,13 @@ class ServerState implements IWebSocketMessageHandler {
 		return webSocketRequestHandler.SendRequest(request);
 	}
 
-	private static function GetNextHealthCheckIntervalSeconds():Float {
+	private static function getNextHealthCheckIntervalSeconds():Float {
 		// Jitter the healthCheck interval +/- a random value between [-MAX_JITTER_SECONDS, MAX_JITTER_SECONDS]
 		var jitter = HealthcheckMaxJitterSeconds * (2 * random.random() - 1);
 		return HealthcheckIntervalSeconds + jitter;
 	}
 
-	private function HeartbeatServerProcess():Void // async
+	private function heartbeatServerProcess():Void // async
 	{
 		// duplicate ProcessReady check here right before invoking
 		if (!processIsReady) {
@@ -217,14 +218,14 @@ class ServerState implements IWebSocketMessageHandler {
 			healthCheckResult = false;
 		}
 
-		var request = new HeartbeatServerProcessRequest(healthCheckResult);
+		var request =  HeartbeatServerProcessRequest.make(healthCheckResult);
 		var outcome = webSocketRequestHandler.SendRequest(request);
 		if (!outcome.success) {
 			Log.warning('Failed to report health status to GameLift service. Error: ${outcome.error}');
 		}
 	}
 
-	public function InitializeNetworking(serverParameters:ServerParameters):GenericOutcome {
+	@async public function initializeNetworking(serverParameters:ServerParameters):GenericOutcome {
 		var websocketUrl = getEnv(EnvironmentVariableWebsocketUrl) ?? serverParameters.webSocketUrl;
 		processId = getEnv(EnvironmentVariableProcessId) ?? serverParameters.processId;
 		hostId = getEnv(EnvironmentVariableHostId) ?? serverParameters.hostId;
@@ -247,11 +248,11 @@ class ServerState implements IWebSocketMessageHandler {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "authToken is required in InitSDK ServerParameters"));
 		}
 
-		return establishNetworking(websocketUrl, authToken);
+		return @await establishNetworking(websocketUrl, authToken);
 	}
 
-	private function establishNetworking(webSocketUrl:String, authToken:String):GenericOutcome {
-		return gameLiftWebSocket.connect(webSocketUrl, processId, hostId, fleetId, authToken);
+	@async private function establishNetworking(webSocketUrl:String, authToken:String):GenericOutcome {
+		return @await gameLiftWebSocket.connect(webSocketUrl, processId, hostId, fleetId, authToken);
 	}
 
 	public function GetComputeCertificate():GetComputeCertificateOutcome {
@@ -344,9 +345,7 @@ class ServerState implements IWebSocketMessageHandler {
 
 		gameSessionId = gameSession.GameSessionId;
 
-		Task.run(() -> {
-			processParameters.onStartGameSession(gameSession);
-		});
+		processParameters.onStartGameSession(gameSession);
 	}
 
 	public function onUpdateGameSession(gameSession:GameSession, updateReason:UpdateReason, backfillTicketId:String) {
@@ -369,9 +368,7 @@ class ServerState implements IWebSocketMessageHandler {
 
 		Log.debug('ServerState got the terminateProcess signal. termination time : ${this.terminationTime}');
 
-		Task.run(() -> {
-			processParameters.onProcessTerminate();
-		});
+		processParameters.onProcessTerminate(this.terminationTime);
 	}
 
 	public function onStartMatchBackfillResponse(requestId:String, ticketId:String) {
@@ -412,7 +409,7 @@ class ServerState implements IWebSocketMessageHandler {
     }
     #end
     
-	public function Shutdown() {
+	public function shutdown() {
 		processIsReady = false;
 
 		// Sleep thread for 1 sec.
@@ -434,7 +431,7 @@ class ServerState implements IWebSocketMessageHandler {
 		if (processIsReady) {
 			if (Date.now().getSeconds() - _lastHealthCheck > HealthcheckIntervalSeconds) {
 				_lastHealthCheck = Date.now().getSeconds();
-				HeartbeatServerProcess();
+				heartbeatServerProcess();
 			}
 		}
 	}

@@ -12,13 +12,14 @@
 
 package aws.gamelift.server;
 
+import hxasync.Asyncable;
 import aws.gamelift.GenericOutcome;
 import aws.gamelift.server.model.PlayerSessionCreationPolicy;
 import aws.gamelift.server.model.*;
 import aws.gamelift.server.model.Messages;
 
 // Name should be "GameLiftServerApi" by C# standard
-class GameLiftServerAPI {
+class GameLiftServerAPI implements Asyncable {
 	private static final SdkVersion = "5.1.1";
 
 	/// <summary>
@@ -69,8 +70,8 @@ class GameLiftServerAPI {
 	/// var initSDKOutcome = GameLiftServerAPI.InitSDK(serverParameters);
 	/// </code>
 	/// </example>
-	public static function InitSDK(serverParameters:ServerParameters):GenericOutcome {
-		return ServerState.instance.InitializeNetworking(serverParameters);
+	@async public static function initSDK(serverParameters:ServerParameters):GenericOutcome {
+		return @await ServerState.instance.initializeNetworking(serverParameters);
 	}
 
 
@@ -108,7 +109,7 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function ProcessReady(processParameters:ProcessParameters):GenericOutcome {
+	public static function processReady(processParameters:ProcessParameters):GenericOutcome {
 		return ServerState.instance.processReady(processParameters);
 	}
 
@@ -132,8 +133,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function ProcessEnding():GenericOutcome {
-		return ServerState.instance.ProcessEnding();
+	public static function processEnding():GenericOutcome {
+		return ServerState.instance.processEnding();
 	}
 
 	/// <summary>
@@ -152,8 +153,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function ActivateGameSession():GenericOutcome {
-		return ServerState.instance.ActivateGameSession();
+	public static function activateGameSession():GenericOutcome {
+		return ServerState.instance.activateGameSession();
 	}
 
 	/// <summary>
@@ -175,8 +176,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function UpdatePlayerSessionCreationPolicy( playerSessionPolicy : PlayerSessionCreationPolicy):GenericOutcome {
-		return ServerState.instance.UpdatePlayerSessionCreationPolicy(playerSessionPolicy);
+	public static function updatePlayerSessionCreationPolicy( playerSessionPolicy : PlayerSessionCreationPolicy):GenericOutcome {
+		return ServerState.instance.updatePlayerSessionCreationPolicy(playerSessionPolicy);
 	}
 
 	/// <summary>
@@ -192,8 +193,8 @@ class GameLiftServerAPI {
 	/// <code>var getGameSessionIdOutcome = GameLiftServerAPI.GetGameSessionId();</code>
 	/// </example>
 
-	public static function GetGameSessionId():AwsStringOutcome {
-		return ServerState.instance.GetGameSessionId();
+	public static function getGameSessionId():AwsStringOutcome {
+		return ServerState.instance.getGameSessionId();
 	}
 
 	/// <summary>
@@ -219,8 +220,8 @@ class GameLiftServerAPI {
 	/// If no termination time is available, returns an error message.</returns>
 	/// <example><c>var getTerminationTimeOutcome = GameLiftServerAPI.GetTerminationTime();</c>.</example>
 
-	public static function GetTerminationTime():AwsDateTimeOutcome {
-		return ServerState.instance.GetTerminationTime();
+	public static function getTerminationTime():AwsDateTimeOutcome {
+		return ServerState.instance.getTerminationTime();
 	}
 
 	/// <summary>
@@ -246,8 +247,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function AcceptPlayerSession( playerSessionId : String):GenericOutcome {
-		return ServerState.instance.AcceptPlayerSession(playerSessionId);
+	public static function acceptPlayerSession( playerSessionId : String):GenericOutcome {
+		return ServerState.instance.acceptPlayerSession(playerSessionId);
 	}
 
 	/// <summary>
@@ -263,8 +264,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function RemovePlayerSession( playerSessionId : String):GenericOutcome {
-		return ServerState.instance.RemovePlayerSession(playerSessionId);
+	public static function removePlayerSession( playerSessionId : String):GenericOutcome {
+		return ServerState.instance.removePlayerSession(playerSessionId);
 	}
 
 	/// <summary>
@@ -293,8 +294,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function DescribePlayerSessions( request : DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
-		return ServerState.instance.DescribePlayerSessions(request);
+	public static function describePlayerSessions( request : DescribePlayerSessionsRequest):DescribePlayerSessionsOutcome {
+		return ServerState.instance.describePlayerSessions(request);
 	}
 
 	/// <summary>Sends a request to find new players for open slots in a game session created with FlexMatch.
@@ -345,8 +346,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function StartMatchBackfill( request : StartMatchBackfillRequest):StartMatchBackfillOutcome {
-		return ServerState.instance.StartMatchBackfill(request);
+	public static function startMatchBackfill( request : StartMatchBackfillRequest):StartMatchBackfillOutcome {
+		return ServerState.instance.startMatchBackfill(request);
 	}
 
 	/// <summary>
@@ -375,8 +376,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function StopMatchBackfill( request : StopMatchBackfillRequest):GenericOutcome {
-		return ServerState.instance.StopMatchBackfill(request);
+	public static function stopMatchBackfill( request : StopMatchBackfillRequest):GenericOutcome {
+		return ServerState.instance.stopMatchBackfill(request);
 	}
 
 	/// <summary>
@@ -397,7 +398,7 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function GetComputeCertificate():GetComputeCertificateOutcome {
+	public static function getComputeCertificate():GetComputeCertificateOutcome {
 		return ServerState.instance.GetComputeCertificate();
 	}
 
@@ -433,7 +434,7 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function GetFleetRoleCredentials( request : GetFleetRoleCredentialsRequest):GetFleetRoleCredentialsOutcome {
+	public static function getFleetRoleCredentials( request : GetFleetRoleCredentialsRequest):GetFleetRoleCredentialsOutcome {
 		return ServerState.instance.GetFleetRoleCredentials(request);
 	}
 
@@ -457,8 +458,8 @@ class GameLiftServerAPI {
 	/// </code>
 	/// </example>
 
-	public static function Destroy():GenericOutcome {
-		ServerState.instance.Shutdown();
+	public static function destroy():GenericOutcome {
+		ServerState.instance.shutdown();
 		return new GenericOutcome();
 	}
 

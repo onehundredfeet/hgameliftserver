@@ -1,3 +1,5 @@
 .haxelib
 bin
 package-lock.json
+dump
+trace.log

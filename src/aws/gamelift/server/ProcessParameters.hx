@@ -5,7 +5,7 @@ import aws.gamelift.server.model.UpdateGameSession;
 
 typedef OnStartGameSessionDelegate = (gameSession:GameSession) -> Void;
 typedef OnUpdateGameSessionDelegate = (updateGameSession:UpdateGameSession) -> Void;
-typedef OnProcessTerminateDelegate = () -> Void;
+typedef OnProcessTerminateDelegate = (time : Date) -> Void;
 typedef OnHealthCheckDelegate = () -> Bool;
 
 /// <summary>
@@ -64,7 +64,7 @@ class ProcessParameters {
 			logParameters:LogParameters = null) {
 		this.onStartGameSession = onStartGameSession != null ? onStartGameSession : (_) -> {};
 		this.onUpdateGameSession = onUpdateGameSession != null ? onUpdateGameSession : (_) -> {};
-		this.onProcessTerminate = onProcessTerminate != null ? onProcessTerminate : () -> {};
+		this.onProcessTerminate = onProcessTerminate != null ? onProcessTerminate : (_) -> {};
 		this.onHealthCheck = onHealthCheck != null ? onHealthCheck : () -> return true;
 		this.port = port;
 		this.logParameters = logParameters;

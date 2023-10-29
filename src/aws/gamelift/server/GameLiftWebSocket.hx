@@ -52,6 +52,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 	}
 
 	@async public function connect(websocketUrl:String, processId:String, hostId:String, fleetId:String, authToken:String):GenericOutcome {
+		trace('Connecting....');
 		this.websocketUrl = websocketUrl;
 		this.processId = processId;
 		this.hostId = hostId;
@@ -88,6 +89,10 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 	 * Update the "action" and message/additional fields to test an API Gateway route/response
 	 */
 	public function sendMessage(message:Message):GenericOutcome {
+		if (_socket == null) {
+			Log.error('sendMessage : Socket is null');
+			return new GenericOutcome();
+		}
 		var json:String = haxe.Json.stringify(message);
 		try {
 			Log.info('Sending message to GameLift: {$json}');
@@ -104,7 +109,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 		var messageStr = messageRaw.toString();
 
 		try {
-			trace('Parsing... ${messageStr}');
+//			trace('Parsing... ${messageStr}');
 			var json:{
 				Error:String,
 				Description:String
@@ -119,7 +124,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 		} catch (e:Exception) {
 			return;
 		}
-		
+
 		try {
 			// Parse message as a response message. This has error fields in it which will be null for a
 			// successful response or generic message not associated with a request.
@@ -129,7 +134,7 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 				Log.error('could not parse message. Data: ${messageStr}');
 				return;
 			}
-			Log.info('Received ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
+			Log.info('Received Action ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
 			// It's safe to cast enums to ints in C#. Each HttpStatusCode enum is associated with its numerical
 			// status code. RequestId will be null when we get a message not associated with a request.
 			if (message.StatusCode != HttpStatusCode.OK && message.RequestId != null) {
@@ -279,25 +284,6 @@ class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 		return endpoint;
 	}
 
-	// Helper method to get the logging level the websocket (websocketsharp library) should use.
-	// Uses the same logging level as used for GameLift Server SDK.
-
-	private static function GetLogLevelForWebsockets():LogLevel {
-		if (Log.isDebugEnabled) {
-			return LogLevel.Trace;
-		}
-		if (Log.isInfoEnabled) {
-			return LogLevel.Info;
-		}
-		if (Log.isWarnEnabled) {
-			return LogLevel.Warn;
-		}
-		if (Log.isErrorEnabled) {
-			return LogLevel.Error;
-		}
-		// otherwise, only log fatal by default
-		return LogLevel.Fatal;
-	}
 
 	public function sendRaw(data:Dynamic):Void {
 		if (_socket == null) {

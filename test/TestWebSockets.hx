@@ -76,11 +76,13 @@ class TestWebSockets implements IWebSocketMessageHandler implements Asyncable{
 		trace('websocketUrl: ' + websocketUrl);
 		var x = @await webSocket.connect(websocketUrl, processId, hostId, fleetId, authToken);
 
-		webSocket.sendRaw("Hello from Haxe");
+		webSocket.sendRaw(haxe.Json.stringify({message: "Hello from Haxe"}));	
 
 		trace('waiting one second ${x}');
 		@await delay(1000);
 		trace('Done now');
+
+		webSocket.disconnect();
 		null;
 	}
 	public static function main() {
