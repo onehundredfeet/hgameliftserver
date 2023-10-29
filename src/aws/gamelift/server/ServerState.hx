@@ -247,10 +247,10 @@ class ServerState implements IWebSocketMessageHandler {
 			return new GenericOutcome(new GameLiftError(GameLiftErrorType.BAD_REQUEST_EXCEPTION, "authToken is required in InitSDK ServerParameters"));
 		}
 
-		return EstablishNetworking(websocketUrl, authToken);
+		return establishNetworking(websocketUrl, authToken);
 	}
 
-	private function EstablishNetworking(webSocketUrl:String, authToken:String):GenericOutcome {
+	private function establishNetworking(webSocketUrl:String, authToken:String):GenericOutcome {
 		return gameLiftWebSocket.connect(webSocketUrl, processId, hostId, fleetId, authToken);
 	}
 
@@ -397,7 +397,7 @@ class ServerState implements IWebSocketMessageHandler {
 	}
 
 	public function onRefreshConnection(refreshConnectionEndpoint:String, authToken:String) {
-		var outcome = EstablishNetworking(refreshConnectionEndpoint, authToken);
+		var outcome = establishNetworking(refreshConnectionEndpoint, authToken);
 
 		if (!outcome.success) {
 			Log.error('Failed to refresh websocket connection. The GameLift SDK will try again each minute until the refresh succeeds, or the websocket is forcibly closed. ${outcome.error}');

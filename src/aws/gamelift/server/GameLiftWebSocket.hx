@@ -1,52 +1,32 @@
 package aws.gamelift.server;
 
+import haxe.Json;
+import js.node.util.Inspect;
+import hxasync.Asyncable;
 import aws.gamelift.IGameLiftWebSocket;
-import hx.ws.WebSocket;
 import aws.gamelift.IWebSocketMessageHandler;
 import aws.gamelift.server.model.*;
 import aws.gamelift.ILog;
-import hx.ws.State as WebSocketState;
 import haxe.Exception;
 import aws.gamelift.GameLiftError;
-import hx.ws.Log as WebSocketLog;
 import aws.gamelift.server.model.Messages;
 import aws.gamelift.HttpStatusCode;
 import aws.gamelift.CloseStatusCode;
-/*
-	enum State {
-	Handshake;
-	Head;
-	HeadExtraLength;
-	HeadExtraMask;
-	Body;
-	Closed;
-	}
+import js.node.RetryWebSocket as WebSocket;
+import js.node.RetryWebSocket.RawWebSocketErrorEvent as WebsocketError;
+import aws.gamelift.Util;
 
-
-
- */
 typedef WebsocketMessageEvent = {data:Dynamic, origin:String, lastEventId:String, source:Dynamic, ports:Dynamic};
 
 /// <summary>
 /// Methods and classes to handle the connection between your game servers and GameLift.
 /// </summary>
-class GameLiftWebSocket implements IGameLiftWebSocket {
-	#if js
+class GameLiftWebSocket implements IGameLiftWebSocket implements Asyncable {
 	static inline var CONNECTING:Int = js.html.WebSocket.CONNECTING;
 	static inline var OPEN:Int = js.html.WebSocket.OPEN;
 	static inline var CLOSING:Int = js.html.WebSocket.CLOSING;
 	static inline var CLOSED:Int = js.html.WebSocket.CLOSED;
-	#else
-	static inline var CONNECTING:Int = hx.ws.ReadyState.CONNECTING;
-	static inline var OPEN:Int = hx.ws.ReadyState.OPEN;
-	static inline var CLOSING:Int = hx.ws.ReadyState.CLOSING;
-	static inline var CLOSED:Int = hx.ws.ReadyState.CLOSED;
-	#end
-	// Websocket library has a built in 10 retry max before all connect attempts raise exceptions.
-	private static final MaxConnectRetries = 5;
-	private static final InitialConnectRetryDelaySeconds = 2;
-	private static final MaxDisconnectWaitRetries = 5;
-	private static final DisconnectWaitStepMillis = 200;
+
 	private static final PidKey = "pID";
 	private static final SdkVersionKey = "sdkVersion";
 	private static final FlavorKey = "sdkLanguage";
@@ -65,34 +45,33 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 	private var hostId:String;
 	private var fleetId:String;
 	private var authToken:String;
+	private var _serverError:String;
 
 	public function new(handler:IWebSocketMessageHandler) {
 		this.handler = handler;
 	}
 
-	public function connect(websocketUrl:String, processId:String, hostId:String, fleetId:String, authToken:String):GenericOutcome {
-		Log.info('Connecting to GameLift websocket server. Websocket URL: ${websocketUrl}, processId: ${processId}, hostId: ${hostId}, fleetId: ${fleetId}');
+	@async public function connect(websocketUrl:String, processId:String, hostId:String, fleetId:String, authToken:String):GenericOutcome {
 		this.websocketUrl = websocketUrl;
 		this.processId = processId;
 		this.hostId = hostId;
 		this.fleetId = fleetId;
 		this.authToken = authToken;
 
-		return PerformConnect();
+		return @await performConnect();
 	}
 
 	public function disconnect():GenericOutcome {
 		Log.debug('Disconnecting. Socket state is: ${_socket.readyState}');
 		// If the websocket is already closing (potentially initiated by GameLift from a ProcessEnding call earlier)
 		// Attempt to wait for it to close.
-		/*
-			if (socket.state == WebSocketState.Closing) {
-				Log.info("WebSocket is in Closing state. Attempting to wait for socket to close");
-				if (!WaitForSocketToClose()) {
-					Log.warning("Timed out waiting for the socket to close. Will retry closing.");
-				}
+
+		if (_socket.readyState == CLOSING) {
+			Log.info("WebSocket is in Closing state. Attempting to wait for socket to close");
+			if (_socket.retryUntilClosed() != null) {
+				Log.warning("Timed out waiting for the socket to close. Will retry closing.");
 			}
-		 */
+		}
 
 		if (_socket.readyState != CLOSED) {
 			Log.debug("Socket is not yet closed. Closing.");
@@ -121,34 +100,110 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 		return new GenericOutcome();
 	}
 
+	private function onMessage(messageRaw:Dynamic) {
+		var messageStr = messageRaw.toString();
 
-	
-	private function PerformConnect():GenericOutcome {
-		var newSocket = new WebSocket(CreateUri());
+		try {
+			trace('Parsing... ${messageStr}');
+			var json:{
+				Error:String,
+				Description:String
+			} = haxe.Json.parse(messageStr);
+			trace('Json: ${json}');
+			if (json != null) {
+				if (!isNullOrEmpty(json.Error)) {
+					_serverError = json.Description;
+					return;
+				}
+			}
+		} catch (e:Exception) {
+			return;
+		}
+		
+		try {
+			// Parse message as a response message. This has error fields in it which will be null for a
+			// successful response or generic message not associated with a request.
+			var message = ResponseMessage.fromJson(messageStr);
 
-		// re-route websocket-sharp logs to use the SDK logger
-		WebSocketLog.logFn = LogWithGameLiftServerSdk;
-		// newSocket.Log.Output = LogWithGameLiftServerSdk;
+			if (message == null) {
+				Log.error('could not parse message. Data: ${messageStr}');
+				return;
+			}
+			Log.info('Received ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
+			// It's safe to cast enums to ints in C#. Each HttpStatusCode enum is associated with its numerical
+			// status code. RequestId will be null when we get a message not associated with a request.
+			if (message.StatusCode != HttpStatusCode.OK && message.RequestId != null) {
+				Log.warning('Received unsuccessful status code ${message.StatusCode} for request ${message.RequestId} with message \'${message.ErrorMessage}\'');
+				handler.onErrorResponse(message.RequestId, message.StatusCode, message.ErrorMessage);
+				return;
+			}
+			switch (message.Action) {
+				case MessageActions.CreateGameSession:
+					{
+						var createGameSessionMessage = CreateGameSessionMessage.fromJson(messageStr);
+						var gameSession = new GameSession(createGameSessionMessage);
+						handler.onStartGameSession(gameSession);
+					}
+				case MessageActions.UpdateGameSession:
+					{
+						var updateGameSessionMessage = UpdateGameSessionMessage.fromJson(messageStr);
+						handler.onUpdateGameSession(updateGameSessionMessage.GameSession, updateGameSessionMessage.UpdateReason,
+							updateGameSessionMessage.BackfillTicketId);
+					}
+				case MessageActions.TerminateProcess:
+					{
+						var terminateProcessMessage = TerminateProcessMessage.fromJson(messageStr);
+						handler.onTerminateProcess(terminateProcessMessage.TerminationTime);
+					}
+				case MessageActions.StartMatchBackfill:
+					{
+						var startMatchBackfillResponse = StartMatchBackfillResponse.fromJson(messageStr);
+						handler.onStartMatchBackfillResponse(startMatchBackfillResponse.RequestId, startMatchBackfillResponse.TicketId);
+					}
+				case MessageActions.DescribePlayerSessions:
+					{
+						var describePlayerSessionsResponse:DescribePlayerSessionsResponse = haxe.Json.parse(messageStr); // new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore })
+						handler.onDescribePlayerSessionsResponse(describePlayerSessionsResponse.RequestId, describePlayerSessionsResponse.PlayerSessions,
+							describePlayerSessionsResponse.NextToken);
+					}
+				case MessageActions.GetComputeCertificate:
+					{
+						var getComputeCertificateResponse:GetComputeCertificateResponse = haxe.Json.parse(messageStr);
 
-		// modify websocket-sharp logging-level to match the SDK's logging level
-		// Note: Override if you would like to log websocket library at a different level from the rest of the SDK.
-		// newSocket.Log.Level = GetLogLevelForWebsockets();
+						handler.onGetComputeCertificateResponse(getComputeCertificateResponse.RequestId, getComputeCertificateResponse.CertificatePath,
+							getComputeCertificateResponse.ComputeName);
+					}
+				case MessageActions.GetFleetRoleCredentials:
+					{
+						var response:GetFleetRoleCredentialsResponse = haxe.Json.parse(messageStr);
 
-		// Socket connection failed during handshake for TLS errors without this protocol enabled
-		//newSocket.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+						handler.onGetFleetRoleCredentialsResponse(response.RequestId, response.AssumedRoleUserArn, response.AssumedRoleId,
+							response.AccessKeyId, response.SecretAccessKey, response.SessionToken, response.Expiration);
+					}
+				case MessageActions.RefreshConnection:
+					{
+						var refreshConnectionMessage:RefreshConnectionMessage = haxe.Json.parse(messageStr);
+						handler.onRefreshConnection(refreshConnectionMessage.RefreshConnectionEndpoint, refreshConnectionMessage.AuthToken);
+					}
+				default:
+					handler.onSuccessResponse(message.RequestId);
+			}
+		} catch (ex:Exception) {
+			Log.error('could not parse message. Data: ${messageStr}');
+		}
+	}
 
-		// Countdown latch to ensure that InitSDK() failure response waits for onClose() in order to return an error type
-		var onCloseCountdownEvent = new CountdownEvent(1);
-		var connectionErrorType = GameLiftErrorType.WEBSOCKET_CONNECT_FAILURE;
+	var onCloseCountdownEvent = new CountdownEvent(1);
+	var connectionOpened = false;
 
-		newSocket.onopen = () -> {
-			Log.info("Connected to GameLift websocket server.");
-		};
+	function onOpen() {
+		Log.info("Connected to GameLift websocket server.");
+	}
 
-		newSocket.onclose = () -> {
-			/*Log.info('Socket disconnected.${e}');
+	function onClose() {
+		Log.info('Socket disconnected.');
 
-			
+		/*
 			if (e.Code == CloseStatusCode.ProtocolError) {
 				connectionErrorType = GameLiftErrorType.WEBSOCKET_CONNECT_FAILURE_FORBIDDEN;
 				Log.error("Handshake with GameLift websocket server failed. Please verify that values of ServerParameters "
@@ -159,126 +214,48 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 				Log.error("Failed to connect to GameLift websocket server. Please verify that the websocket url in "
 					+ "InitSDK() is correct and network status is normal.");
 			}
-			*/
+		 */
 
-			// Resolve countdown latch to unblock InitSDK() from returning a result
-			if (!onCloseCountdownEvent.IsSet) {
-				onCloseCountdownEvent.Signal();
-			}
-		};
+		// Resolve countdown latch to unblock InitSDK() from returning a result
+		if (!onCloseCountdownEvent.isSet) {
+			onCloseCountdownEvent.signal();
+		}
+	}
 
-		newSocket.onerror = (e:Dynamic) -> {
-			if (e.Message != null && e.Message.Contains(SocketClosingErrorMessage)) {
-				Log.warning("WebSocket reported error on closing connection. This may be because the connection is already closed");
-			} else {
-				Log.error('Error received from GameLift websocket server. Error Message: "${e.Message}". Exception: "${e.Exception}"');
-			}
-		};
+	function onError(e:WebsocketError) {
+		Log.error('Connection error: ${e.errno} : ${e.code}');
+	};
 
+	@async private function performConnect():GenericOutcome {
+		Log.info('performConnect Connecting to GameLift websocket server. Websocket URL: ${websocketUrl}, processId: ${processId}, hostId: ${hostId}, fleetId: ${fleetId}');
+		var newSocket = new WebSocket(createUri());
 
-		newSocket.onmessage = (data:hx.ws.Types.MessageType) -> {
+		// modify websocket-sharp logging-level to match the SDK's logging level
+		// Note: Override if you would like to log websocket library at a different level from the rest of the SDK.
+		// newSocket.Log.Level = GetLogLevelForWebsockets();
 
-			switch(data){
-				case BytesMessage(content):
-					Log.warning('Unknown Data received. Data: ${content}');
-				case StrMessage(content):
-					try {
-						// Parse message as a response message. This has error fields in it which will be null for a
-						// successful response or generic message not associated with a request.
-						var message = ResponseMessage.fromJson(content);
+		// Socket connection failed during handshake for TLS errors without this protocol enabled
+		// newSocket.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls12;
 
-						if (message == null) {
-							Log.error('could not parse message. Data: ${content}');
-							return;
-						}
-		
-						Log.info('Received ${message.Action} for GameLift with status ${message.StatusCode}. Data: ${message}');
-		
-						// It's safe to cast enums to ints in C#. Each HttpStatusCode enum is associated with its numerical
-						// status code. RequestId will be null when we get a message not associated with a request.
-						if (message.StatusCode != HttpStatusCode.OK && message.RequestId != null) {
-							Log.warning('Received unsuccessful status code ${message.StatusCode} for request ${message.RequestId} with message \'${message.ErrorMessage}\'');
-							handler.onErrorResponse(message.RequestId, message.StatusCode, message.ErrorMessage);
-							return;
-						}
-		
-						switch (message.Action) {
-							case MessageActions.CreateGameSession: {
-									var createGameSessionMessage = CreateGameSessionMessage.fromJson(content);
-									var gameSession = new GameSession(createGameSessionMessage);
-									handler.onStartGameSession(gameSession);
-								}
-		
-							case MessageActions.UpdateGameSession: {
-									var updateGameSessionMessage = UpdateGameSessionMessage.fromJson(content);
-									handler.onUpdateGameSession(updateGameSessionMessage.GameSession,
-										updateGameSessionMessage.UpdateReason, updateGameSessionMessage.BackfillTicketId);
-								}
-		
-							case MessageActions.TerminateProcess: {
-									var terminateProcessMessage = TerminateProcessMessage.fromJson(content);
-									handler.onTerminateProcess(terminateProcessMessage.TerminationTime);
-								}
-		
-							case MessageActions.StartMatchBackfill: {
-									var startMatchBackfillResponse = StartMatchBackfillResponse.fromJson(content);
-									handler.onStartMatchBackfillResponse(startMatchBackfillResponse.RequestId, startMatchBackfillResponse.TicketId);
-								}
-		
-							case MessageActions.DescribePlayerSessions: {
-									var describePlayerSessionsResponse:DescribePlayerSessionsResponse = haxe.Json.parse(content); // new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore })
-									handler.onDescribePlayerSessionsResponse(describePlayerSessionsResponse.RequestId, describePlayerSessionsResponse.PlayerSessions,
-										describePlayerSessionsResponse.NextToken);
-								}
-		
-							case MessageActions.GetComputeCertificate: {
-									var getComputeCertificateResponse:GetComputeCertificateResponse = haxe.Json.parse(content);
-									handler.onGetComputeCertificateResponse(getComputeCertificateResponse.RequestId, getComputeCertificateResponse.CertificatePath,
-										getComputeCertificateResponse.ComputeName);
-								}
-		
-							case MessageActions.GetFleetRoleCredentials: {
-									var response:GetFleetRoleCredentialsResponse = haxe.Json.parse(content);
-									handler.onGetFleetRoleCredentialsResponse(response.RequestId, response.AssumedRoleUserArn, response.AssumedRoleId,
-										response.AccessKeyId, response.SecretAccessKey, response.SessionToken, response.Expiration);
-								}
-		
-							case MessageActions.RefreshConnection: {
-									var refreshConnectionMessage:RefreshConnectionMessage = haxe.Json.parse(content);
-									handler.onRefreshConnection(refreshConnectionMessage.RefreshConnectionEndpoint, refreshConnectionMessage.AuthToken);
-								}
-		
-							default:
-								handler.onSuccessResponse(message.RequestId);
-						}
-					} catch (ex:Exception) {
-						Log.error('could not parse message. Data: ${content}');
-					}
-			}
+		// Countdown latch to ensure that InitSDK() failure response waits for onClose() in order to return an error type
+		onCloseCountdownEvent = new CountdownEvent(1);
+		var connectionErrorType = GameLiftErrorType.WEBSOCKET_CONNECT_FAILURE;
 
-			
-		};
+		newSocket.onOpen = onOpen;
+		newSocket.onClose = onClose;
+		newSocket.onError = onError;
+		newSocket.onMessage = onMessage;
 
 		// Policy that retries if function returns false with exponential backoff.
-		//var retryPolicy = Policy.HandleResult<bool>(r -> !r)
-		//	.WaitAndRetry(MaxConnectRetries, retry -> TimeSpan.FromSeconds(Math.Pow(InitialConnectRetryDelaySeconds, retry)));
-
 		// Specific exceptions that prevent connection are swallowed and logged during connect.
 		// Exceptions thrown for invalid arguments and max retries, which are not retriable.
-		var wasSuccessful = retryPolicy.Execute(() -> {
-			newSocket.open();
-			//return newSocket.isAlive;
-			return true;
-		});
 
-		if (!wasSuccessful) {
+		var opened = @await newSocket.retryUntilOpen();
+
+		if (!opened) {
 			// Wait for countdown latch to be resolved in OnClose() in order to know the connection error type
-			onCloseCountdownEvent.Wait();
-
-			try {
+			if (newSocket.readyState != CLOSED) {
 				newSocket.close(); // CloseStatusCode.Normal
-			} catch (e:Exception) {
-				Log.warning("Failed to close new websocket after a connection failure, ignoring");
 			}
 
 			return new GenericOutcome(new GameLiftError(connectionErrorType));
@@ -296,40 +273,10 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 		return new GenericOutcome();
 	}
 
-	private function CreateUri():String {
+	private function createUri():String {
 		var queryString = '${PidKey}=${processId}&${SdkVersionKey}=${GameLiftServerAPI.GetSdkVersion().result}&${FlavorKey}=${Flavor}&${AuthTokenKey}=${authToken}&${ComputeIdKey}=${hostId}&${FleetIdKey}=${fleetId}';
 		var endpoint = '${websocketUrl}?${queryString}';
 		return endpoint;
-	}
-
-	private function WaitForSocketToClose():Bool {
-		// Policy that retries if function returns false with with constant interval
-		var retryPolicy = Policy.HandleResult<bool>(r -> !r)
-			.WaitAndRetry(MaxDisconnectWaitRetries, retry -> TimeSpan.fromMilliseconds(DisconnectWaitStepMillis));
-		return retryPolicy.Execute(() -> {
-			return _socket.readyState == WebSocketState.Closed;
-		});
-	}
-
-	// Helper method to link WebsocketSharp logger with the GameLift SDK logger
-
-	private static function LogWithGameLiftServerSdk(data:Dynamic) { // data:LogData, path:String
-		Log.debug(data);
-		/*
-			var socketLogData = data.toString();
-			switch (data.level) {
-				case LogLevel.Info:
-					Log.info(socketLogData);
-				case LogLevel.Warn:
-					Log.warning(socketLogData);
-				case LogLevel.Error:
-					Log.error(socketLogData);
-				case LogLevel.Fatal:
-					Log.fatal(socketLogData);
-				default:
-					Log.debug(socketLogData);
-			}
-		 */
 	}
 
 	// Helper method to get the logging level the websocket (websocketsharp library) should use.
@@ -350,5 +297,15 @@ class GameLiftWebSocket implements IGameLiftWebSocket {
 		}
 		// otherwise, only log fatal by default
 		return LogLevel.Fatal;
+	}
+
+	public function sendRaw(data:Dynamic):Void {
+		if (_socket == null) {
+			trace('Socket is null');
+			return;
+		}
+		if (_socket.readyState == OPEN) {
+			_socket.send(data);
+		}
 	}
 }

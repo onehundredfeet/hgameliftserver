@@ -2,11 +2,13 @@
 --class-path test
 --library uuid
 --library seedyrng
---library hxWebSockets
+#--library hxWebSockets
 --library haxe-concurrent
 --library hxnodejs
 --library json2object
 --library hxnodejs
+#--library haxe-continuation
+--library hxasync
 
 --main Test
 --js bin/main.js
