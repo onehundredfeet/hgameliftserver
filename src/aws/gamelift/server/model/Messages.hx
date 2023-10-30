@@ -5,18 +5,18 @@ import uuid.Uuid;
 class MessageActions {
 	// Game Server to Cloud server
 	public static final ActivateServerProcess = "ActivateServerProcess";
-	public static final CreateGameSession = "CreateGameSession";
-	public static final TerminateProcess = "TerminateProcess";
+	public static final TerminateServerProcess = "TerminateServerProcess";
+	public static final HeartbeatServerProcess = "HeartbeatServerProcess";
 
 	// Cloud Server to Game Server
 	public static final ActivateGameSession = "ActivateGameSession";
-	public static final TerminateServerProcess = "TerminateServerProcess";
-	public static final HeartbeatServerProcess = "HeartbeatServerProcess";
+	public static final CreateGameSession = "CreateGameSession";
+	public static final TerminateProcess = "TerminateProcess";
+	public static final UpdateGameSession = "UpdateGameSession";
 
 	// bidirectional
 	public static final AcceptPlayerSession = "AcceptPlayerSession";
 	public static final UpdatePlayerSessionCreationPolicy = "UpdatePlayerSessionCreationPolicy";
-	public static final UpdateGameSession = "UpdateGameSession";
 	public static final StartMatchBackfill = "StartMatchBackfill";
 	public static final DescribePlayerSessions = "DescribePlayerSessions";
 	public static final StopMatchBackfill = "StopMatchBackfill";

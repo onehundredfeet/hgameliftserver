@@ -20,8 +20,34 @@ class TestGamelift implements Asyncable {
 	private static final EnvironmentVariableFleetId = "GAMELIFT_SDK_FLEET_ID";
 	private static final EnvironmentVariableAuthToken = "GAMELIFT_SDK_AUTH_TOKEN";
 
+    #if cloud
+    static var gameRoot = "/local/game";
+    #else
+    static var gameRoot = "";
+    #end
+	// Set a custom trace function
+	static var _logFileName = gameRoot + "/log.txt";
+
 	@async public static function execute() {
-		var serverParameters = new ServerParameters("ws://localhost:1337", "Derp", "localhost", "0", "empty");
+		// Identify port number (hard coded here for simplicity) the game server is listening on for player connections
+		var listeningPort = 7777;
+
+		// WebSocketUrl from RegisterHost call
+		var webSocketUrl = "wss://us-east-1.api.amazongamelift.com";
+
+		// Unique identifier for this process
+		var processId = "myProcess";
+
+		// Unique identifier for your host that this process belongs to
+		var hostId = "myHost";
+
+		// Unique identifier for your fleet that this host belongs to
+		var fleetId = "myFleet";
+
+		// Authentication token for this host process.
+		var authToken = "myAuthToken";
+
+		var serverParameters = new ServerParameters(webSocketUrl, processId, hostId, fleetId, authToken);
 
 		@await GameLiftServerAPI.initSDK(serverParameters);
 
@@ -30,82 +56,80 @@ class TestGamelift implements Asyncable {
 			trace("onStartGameSession");
 			GameLiftServerAPI.activateGameSession();
 		};
-		processParameters.onUpdateGameSession = function(update:GameSession, reason:UpdateReason, backfillTicketId: String) {
+		processParameters.onUpdateGameSession = function(update:GameSession, reason:UpdateReason, backfillTicketId:String) {
 			trace("onUpdateGameSession");
 		};
-        var _ended = false;
-        var _endTime = null;
+		var _ended = false;
+		var _endTime = null;
 
 		processParameters.onProcessTerminate = function(time:Date) {
 			trace('onTerminateProcess before ${time}');
-            _ended = true;
-            _endTime = time;
-            GameLiftServerAPI.processEnding();
+			_ended = true;
+			_endTime = time;
+			GameLiftServerAPI.processEnding();
 		};
 		processParameters.onHealthCheck = function() {
 			trace("onHealthCheck");
 			return true;
 		};
-		processParameters.port = 1338;
-		var logs = new LogParameters(["./logs.txt"]);
+		processParameters.port = listeningPort;
+		var logs = new LogParameters([_logFileName]);
 		processParameters.logParameters = logs;
 
 		GameLiftServerAPI.processReady(processParameters);
 		trace("hi from the other side!");
 
-        while (_endTime == null || _endTime.getTime() > Date.now().getTime()) {
-            if (_endTime != null) {
-                Sys.println('Shutting down in ${_endTime.getTime() - Date.now().getTime()} ms');
-            }
-            trace('Ticking ${_endTime} - ${ Date.now()}');
-            GameLiftServerAPI.tick(.100);
-            @await delay(100);
-        }
+		while (_endTime == null || _endTime.getTime() > Date.now().getTime()) {
+			if (_endTime != null) {
+				Sys.println('Shutting down in ${_endTime.getTime() - Date.now().getTime()} ms');
+			}
+			trace('Ticking ${_endTime} - ${Date.now()}');
+			GameLiftServerAPI.tick(.100);
+			@await delay(100);
+		}
 
-        trace('Destroying');
-        @await GameLiftServerAPI.destroy();
-        trace('Destroyed');
+		trace('Destroying');
+		@await GameLiftServerAPI.destroy();
+		trace('Destroyed');
 		null;
 	}
 
-	// Set a custom trace function
-	static var _logFileName = "trace.log";
-
 	static function customTrace(v:Dynamic, ?infos:haxe.PosInfos) {
-        var date = Date.now();
+		var date = Date.now();
 
 		var message = '${date} ${infos.fileName}:${infos.lineNumber}: ${v}';
 
-        // Write the message to the console
-        Sys.println(message);
+		// Write the message to the console
+		Sys.println(message);
 
 		// Append the message to a file
 		appendToFile(_logFileName, message);
 	}
 
 	static function appendToFile(filename:String, text:String):Void {
-        var contents = sys.io.File.getContent(filename);
-        contents += text + '\n';
-        sys.io.File.saveContent(filename, contents);
+		var contents = sys.io.File.getContent(filename);
+		contents += text + '\n';
+		sys.io.File.saveContent(filename, contents);
 	}
 
-    static function resetLog() {
-        if (sys.FileSystem.exists(_logFileName)) {
-            try {
-                sys.FileSystem.deleteFile(_logFileName);
-            } catch (e:Dynamic) {
-                Sys.println("Error deleting log file: " + e);
-            }
-        }
-        sys.io.File.saveContent(_logFileName, "");
-    }
+	static function resetLog() {
+		if (sys.FileSystem.exists(_logFileName)) {
+			try {
+				sys.FileSystem.deleteFile(_logFileName);
+			} catch (e:Dynamic) {
+				Sys.println("Error deleting log file: " + e);
+			}
+		}
+		sys.io.File.saveContent(_logFileName, "");
+	}
+
 	public static function main() {
-        resetLog();
+		resetLog();
 		haxe.Log.trace = customTrace;
-        try {
-            execute();
-        } catch (e:Dynamic) {
-            Sys.println("Error: " + e);
-        }
+		try {
+			execute();
+		} catch (e:Dynamic) {
+			Sys.println("Error: " + e);
+		}
 	}
 }

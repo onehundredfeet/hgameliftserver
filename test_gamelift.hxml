@@ -1,5 +1,5 @@
 common.hxml
-
+-D cloud
 --main TestGamelift
 --js bin/testgl.js
 
