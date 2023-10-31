@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = GameLiftServerSDK
+build_property.ProjectDir = /Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/

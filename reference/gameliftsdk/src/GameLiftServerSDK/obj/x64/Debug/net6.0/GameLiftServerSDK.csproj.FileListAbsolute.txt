@@ -1,0 +1,12 @@
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/bin/x64/Debug/net6.0/log4net.config
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/bin/x64/Debug/net6.0/GameLiftServerSDK.dll.config
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/bin/x64/Debug/net6.0/GameLiftServerSDK.deps.json
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/bin/x64/Debug/net6.0/GameLiftServerSDK.dll
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/bin/x64/Debug/net6.0/GameLiftServerSDK.pdb
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/GameLiftServerSDK.csproj.AssemblyReference.cache
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/GameLiftServerSDK.GeneratedMSBuildEditorConfig.editorconfig
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/GameLiftServerSDK.csproj.CoreCompileInputs.cache
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/GameLiftServerSDK.dll
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/refint/GameLiftServerSDK.dll
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/GameLiftServerSDK.pdb
+/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/x64/Debug/net6.0/ref/GameLiftServerSDK.dll

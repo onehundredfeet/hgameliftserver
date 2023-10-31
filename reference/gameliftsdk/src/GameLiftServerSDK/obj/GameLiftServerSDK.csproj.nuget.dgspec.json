@@ -1,0 +1,110 @@
+{
+  "format": 1,
+  "restore": {
+    "/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/GameLiftServerSDK.csproj": {}
+  },
+  "projects": {
+    "/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/GameLiftServerSDK.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/GameLiftServerSDK.csproj",
+        "projectName": "GameLiftServerSDK",
+        "projectPath": "/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/GameLiftServerSDK.csproj",
+        "packagesPath": "/Users/rcleven/.nuget/packages/",
+        "outputPath": "/Users/rcleven/git/firedragon/game/server/gameliftsdk/src/GameLiftServerSDK/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/rcleven/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net7.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net7.0": {
+            "targetAlias": "net7.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net7.0": {
+          "targetAlias": "net7.0",
+          "dependencies": {
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.2, )"
+            },
+            "Polly": {
+              "target": "Package",
+              "version": "[7.2.3, )"
+            },
+            "SonarAnalyzer.CSharp": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.51.0.59060, )"
+            },
+            "StyleCop.Analyzers": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.1.118, )"
+            },
+            "log4net": {
+              "target": "Package",
+              "version": "[2.0.15, )"
+            },
+            "websocketsharp.core": {
+              "target": "Package",
+              "version": "[1.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Runtime.osx-x64",
+              "version": "[7.0.12, 7.0.12]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Crossgen2.osx-arm64",
+              "version": "[7.0.12, 7.0.12]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Runtime.osx-x64",
+              "version": "[7.0.12, 7.0.12]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/7.0.402/RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "osx-x64": {
+          "#import": []
+        }
+      }
+    }
+  }
+}
