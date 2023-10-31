@@ -23,7 +23,7 @@ class TestGamelift implements Asyncable {
     #if cloud
     static var gameRoot = "/local/game";
     #else
-    static var gameRoot = "";
+    static var gameRoot = ".";
     #end
 	// Set a custom trace function
 	static var _logFileName = gameRoot + "/log.txt";
@@ -33,7 +33,11 @@ class TestGamelift implements Asyncable {
 		var listeningPort = 7777;
 
 		// WebSocketUrl from RegisterHost call
+		#if cloud
 		var webSocketUrl = "wss://us-east-1.api.amazongamelift.com";
+		#else
+		var webSocketUrl = "ws://localhost:1337";
+		#end
 
 		// Unique identifier for this process
 		var processId = "myProcess";
@@ -83,7 +87,7 @@ class TestGamelift implements Asyncable {
 			if (_endTime != null) {
 				Sys.println('Shutting down in ${_endTime.getTime() - Date.now().getTime()} ms');
 			}
-			trace('Ticking ${_endTime} - ${Date.now()}');
+//			trace('Ticking ${_endTime} - ${Date.now()}');
 			GameLiftServerAPI.tick(.100);
 			@await delay(100);
 		}

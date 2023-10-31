@@ -164,7 +164,7 @@ class GameLiftWebSocketRequestHandler implements Asyncable {
 	}
 
 	private function removePromise(requestId:String):GameLiftWebSocketRequestEntry {
-		trace('Removing promise for request "${requestId}".');
+//		trace('Removing promise for request "${requestId}".');
         var promise = requestIdToPromise.tryRemove(requestId);
 
 		if (promise == null) {
@@ -172,7 +172,7 @@ class GameLiftWebSocketRequestHandler implements Asyncable {
 			return null;
 		}
 
-		trace('removed promise for request "${requestId}".');
+//		trace('removed promise for request "${requestId}".');
 		return promise;
 	}
 }

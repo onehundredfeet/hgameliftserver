@@ -451,7 +451,7 @@ class ServerState implements IWebSocketMessageHandler implements Asyncable {
 				heartbeatServerProcess();
 			}
 		} else {
-			trace("processIsReady is false");
+//			trace("processIsReady is false");
 		}
 	}
 }
