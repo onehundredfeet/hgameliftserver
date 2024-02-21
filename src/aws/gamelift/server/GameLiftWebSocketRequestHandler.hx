@@ -3,7 +3,6 @@ package aws.gamelift.server;
 import hxasync.Asyncable;
 import aws.gamelift.*;
 import aws.gamelift.server.model.*;
-import hx.concurrent.collection.SynchronizedMap;
 import aws.gamelift.Util;
 import aws.gamelift.GameLiftError;
 using aws.gamelift.Extensions;
@@ -48,11 +47,8 @@ class GameLiftWebSocketRequestEntry {
 }
 class GameLiftWebSocketRequestHandler implements Asyncable {
 	private static inline final ServiceCallTimeoutMillis = 5000;
-
-	private final requestIdToPromise = SynchronizedMap.from(new Map<String,GameLiftWebSocketRequestEntry>());
-
+	private final requestIdToPromise = new Map<String,GameLiftWebSocketRequestEntry>();
 	private final gameLiftWebSocket:IGameLiftWebSocket;
-
 	public static var Log(default, null):ILog = LogManager.GetLogger(Type.typeof(GameLiftWebSocketRequestHandler));
 
 	public function new(webSocket:IGameLiftWebSocket = null) {

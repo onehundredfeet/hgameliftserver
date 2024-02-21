@@ -11,8 +11,6 @@
     "dependencies": {
         "uuid": "",
         "seedyrng": "",
-        "hxWebSockets": "",
-        "haxe-concurrent": "",
         "hxnodejs": "",
         "json2object": ""
       }
